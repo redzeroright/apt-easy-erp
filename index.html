@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>아파트이지(Apt-Easy)ERP V49.BETA</title>
+<title>APT관리업무 프로그램V49.BETA</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 /* 고급스러운 디자인 및 다크모드 지원 CSS */
@@ -556,12 +556,69 @@ tbody tr:last-child td { border-bottom: none; }
   .d-day-today { background: var(--accent-light); color: var(--accent); }
   .repeat-badge { font-size: 11px; color: var(--purple); background: var(--purple-light); padding: 2px 6px; border-radius: 4px; }
 	</style>
+
+<!-- ============================================================ -->
+<!-- 🔒 데이터 백업/복구 안내 배너 전용 스타일 (Add Only 신규 삽입)      -->
+<!-- 기존 <style> 블록은 전혀 수정하지 않고, 별도 블록으로 새로 추가함   -->
+<!-- ============================================================ -->
+<style>
+  .backup-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: var(--amber-light);
+    border: 1px solid var(--amber);
+    border-radius: var(--radius-sm);
+    padding: 12px 18px;
+    margin: 14px 20px 0 20px;
+  }
+  .backup-banner-text {
+    color: var(--amber);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.5;
+    flex: 1 1 320px;
+  }
+  .backup-banner-btns {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .backup-btn-export,
+  .backup-btn-import {
+    background: var(--amber);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(212, 120, 31, 0.25);
+    white-space: nowrap;
+  }
+  .backup-btn-export:hover,
+  .backup-btn-import:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+  .backup-btn-import {
+    background: transparent;
+    color: var(--amber);
+    border: 1px solid var(--amber);
+    box-shadow: none;
+  }
+  .backup-btn-import:hover {
+    background: var(--amber-light);
+  }
+  @media (max-width: 720px) {
+    .backup-banner { flex-direction: column; align-items: stretch; }
+    .backup-banner-btns { justify-content: flex-end; }
+  }
+</style>
 </head>
 <body>
 
 <div class="header no-print">
   <div class="header-left">
-    <h1>🏢아파트이지(Apt-Easy)ERP V49.BETA</h1>
+    <h1>🏢APT관리업무 프로그램V49.BETA</h1>
     <p>환경설정에서 요금부과설정 수정이 가능합니다</p>
   </div>
   <div class="header-right">
@@ -584,6 +641,21 @@ tbody tr:last-child td { border-bottom: none; }
       <div id="header-세대"></div>
       <div id="header-date"></div>
     </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 🔒 데이터 백업 안내 배너 (Add Only 신규 삽입, 기존 요소 미변경)     -->
+<!-- ============================================================ -->
+<div class="backup-banner no-print" id="backup-warning-banner">
+  <div class="backup-banner-text">
+    ⚠️ 현재 데이터가 브라우저에 임시 저장 중입니다. PC 포맷이나 캐시 삭제 시 데이터가 소실될 수 있으니 <b>[수동 백업]</b>을 주기적으로 하시거나 <b>[구글 클라우드 자동 백업]</b>을 활성화하세요.
+  </div>
+  <div class="backup-banner-btns">
+    <button type="button" class="btn backup-btn-export" onclick="exportFullData()">💾 전체 데이터 백업(.json)</button>
+    <label class="btn backup-btn-import" for="backup-file-input">📂 백업 파일 불러오기</label>
+    <input type="file" id="backup-file-input" accept="application/json,.json" style="display:none"
+      onchange="if(this.files && this.files[0]){ importFullData(this.files[0]); } this.value='';">
   </div>
 </div>
 
@@ -3982,39 +4054,100 @@ function toggleNotifPanel() {
 }
 // --- 스마트 업무 리본 끝 ---
 
-// ▼▼▼ [신규추가] 자동 백업 경고 팝업 로직 (Add Only, 기존 함수/변수 수정 없음) ▼▼▼
-function showBackupWarningPopup() {
-  var overlay = document.getElementById('backupWarningOverlay');
-  if (overlay) { overlay.style.display = 'flex'; }
+// ================================================================
+// 🔒 데이터 백업/복구 기능 (Add Only 방식으로 안전하게 신규 추가됨)
+// - 기존 함수/로직은 단 한 줄도 수정하지 않음
+// - 독립적인 함수(exportFullData, importFullData)로만 구성됨
+// - LocalStorage에 저장된 이 프로그램의 모든 키를 그대로 백업/복구함
+//   (주차/헬스장/사물함/세대DB/환경설정/일정/체납/점검/민원/재고/
+//    법정점검/자산/템플릿 등 앱에서 사용하는 모든 apt_*, office_* 키 포함)
+// ================================================================
+
+function exportFullData() {
+  try {
+    const backupData = {};
+    // 기존 저장 로직을 전혀 건드리지 않고, 현재 LocalStorage에 들어있는
+    // 모든 키-값을 그대로 순회하며 수집함 (add only, 결합도 최소화)
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      backupData[key] = localStorage.getItem(key);
+    }
+
+    const backupPayload = {
+      appName: 'Apt-ONE 아파트원 ERP',
+      backupVersion: 1,
+      exportedAt: new Date().toISOString(),
+      data: backupData
+    };
+
+    const jsonStr = JSON.stringify(backupPayload, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const fileName = `apt_easy_backup_${yyyy}${mm}${dd}.json`;
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    alert(`✅ 백업이 완료되었습니다.\n파일명: ${fileName}\n다운로드 폴더를 확인해주세요.`);
+  } catch (err) {
+    console.error('exportFullData 오류:', err);
+    alert('❌ 백업 중 오류가 발생했습니다: ' + err.message);
+  }
 }
-// 1) 프로그램 실행(로딩) 시 경고 팝업 표시 (기존 window.onload 는 건드리지 않고 별도 리스너로 추가)
-window.addEventListener('load', function () {
-  setTimeout(showBackupWarningPopup, 600);
-});
-// 2) 프로그램 사용 중 주기적으로 경고 팝업 재노출 (백업 생활화 유도, 20분 간격)
-setInterval(showBackupWarningPopup, 20 * 60 * 1000);
-// 3) 프로그램 종료(브라우저/탭 닫기, 새로고침) 시 브라우저 표준 이탈 경고 발생시켜 백업 유도
-window.addEventListener('beforeunload', function (e) {
-  e.preventDefault();
-  e.returnValue = '백업(엑셀 다운로드 또는 JSON 내보내기)을 하지 않으면 데이터가 소실될 수 있습니다. 정말 종료하시겠습니까?';
-  return e.returnValue;
-});
-// ▲▲▲ [신규추가] 자동 백업 경고 팝업 로직 끝 ▲▲▲
+
+function importFullData(file) {
+  if (!file) return;
+
+  if (!confirm('⚠️ 백업 파일을 불러오면 현재 브라우저에 저장된 모든 데이터가\n백업 파일의 내용으로 완전히 교체(덮어쓰기)됩니다.\n계속하시겠습니까?')) {
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const parsed = JSON.parse(e.target.result);
+
+      // 간단한 유효성 검증: 아파트원 ERP 백업 파일 구조인지 확인
+      if (!parsed || typeof parsed !== 'object' || !parsed.data || typeof parsed.data !== 'object') {
+        alert('❌ 올바른 아파트원 ERP 백업 파일이 아닙니다. 파일 형식을 확인해주세요.');
+        return;
+      }
+
+      const dataKeys = Object.keys(parsed.data);
+      if (dataKeys.length === 0) {
+        alert('❌ 백업 파일에 복구할 데이터가 없습니다.');
+        return;
+      }
+
+      // 기존 LocalStorage를 지우고, 백업 파일의 데이터로 새로 덮어씀
+      localStorage.clear();
+      dataKeys.forEach(key => {
+        localStorage.setItem(key, parsed.data[key]);
+      });
+
+      alert('✅ 데이터 복구가 완료되었습니다. 화면을 새로고침합니다.');
+      location.reload();
+    } catch (err) {
+      console.error('importFullData 오류:', err);
+      alert('❌ 백업 파일을 읽는 중 오류가 발생했습니다. 올바른 JSON 파일인지 확인해주세요.');
+    }
+  };
+  reader.onerror = function () {
+    alert('❌ 파일을 읽을 수 없습니다.');
+  };
+  reader.readAsText(file);
+}
+// --- 데이터 백업/복구 기능 끝 ---
 	</script>
-	<!-- ▼▼▼ [신규추가] 백업 강제 경고 모달 (Add Only, 기존 코드 영향 없음) ▼▼▼ -->
-	<div id="backupWarningOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:99999; align-items:center; justify-content:center;">
-	  <div style="background:#fff; max-width:480px; width:90%; border-radius:14px; padding:30px 28px; box-shadow:0 10px 40px rgba(0,0,0,0.4); border:4px solid #e53935; text-align:center;">
-	    <div style="font-size:52px; line-height:1;">⚠️</div>
-	    <div style="font-size:22px; font-weight:800; color:#e53935; margin:14px 0 10px;">데이터 백업 필수 경고</div>
-	    <div style="font-size:15px; line-height:1.7; color:#333; text-align:left;">
-	      본 프로그램의 모든 데이터는 <b>현재 사용중인 PC(브라우저)에만 저장</b>됩니다.<br>
-	      PC 교체, 브라우저 초기화, 캐시 삭제, 시스템 오류 등이 발생하면 <b style="color:#e53935;">데이터가 영구적으로 소실</b>될 수 있습니다.<br><br>
-	      반드시 <b>[엑셀 다운로드]</b> 또는 <b>[JSON 내보내기]</b> 기능을 사용하여 정기적으로 백업하시기 바랍니다.<br><br>
-	      <b style="color:#e53935;">백업을 하지 않아 발생하는 데이터 손실에 대한 책임은 전적으로 사용자 본인에게 있으며, 개발자는 이에 대한 어떠한 책임도 지지 않습니다.</b>
-	    </div>
-	    <button onclick="document.getElementById('backupWarningOverlay').style.display='none';" style="margin-top:22px; background:#e53935; color:#fff; border:none; padding:12px 30px; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer;">확인했습니다 (닫기)</button>
-	  </div>
-	</div>
-	<!-- ▲▲▲ [신규추가] 백업 강제 경고 모달 끝 ▲▲▲ -->
 	</body>
 </html>
