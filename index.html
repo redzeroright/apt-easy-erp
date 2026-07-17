@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>아파트이지(APT-EASY) ERP V50 (버그수정판)</title>
+<title>아파트이지(APT-EASY) ERP V51 (월마감 업무판)</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
@@ -695,6 +695,56 @@ table.tbl tbody tr:hover { background: var(--accent-light); }
 .timeline-item::before { border-color: var(--card) !important; }
 .db-modal-list thead th { background: var(--hover) !important; }
 
+/* ===== [v51] 부과확정 / 수납 / 체납 ===== */
+.nav-badge {
+  display: inline-block; min-width: 18px; padding: 1px 6px; margin-left: 6px;
+  background: var(--red); color: #fff; border-radius: 10px;
+  font-size: 10px; font-weight: 800; text-align: center; vertical-align: middle;
+}
+.flow-steps { display: flex; gap: 0; margin-bottom: 22px; flex-wrap: wrap; }
+.flow-step {
+  flex: 1; min-width: 130px; padding: 12px 10px; text-align: center;
+  background: var(--bg); border: 1px solid var(--border); font-size: 12px;
+  color: var(--text2); position: relative; cursor: pointer; transition: .15s;
+}
+.flow-step:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.flow-step:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.flow-step + .flow-step { border-left: none; }
+.flow-step:hover { background: var(--hover); }
+.flow-step.active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 800; }
+.flow-step.done { background: var(--green-light); color: var(--green); border-color: var(--green); }
+.flow-step b { display: block; font-size: 13px; margin-bottom: 2px; }
+.flow-step small { font-size: 10px; opacity: .85; }
+
+.st-badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:800; white-space:nowrap; }
+.st-완납   { background: var(--green-light); color: var(--green); }
+.st-부분납 { background: var(--amber-light); color: var(--amber); }
+.st-미납   { background: var(--red-light);   color: var(--red); }
+.st-과납   { background: var(--accent-light); color: var(--accent); }
+.st-부과없음 { background: var(--bg); color: var(--text2); }
+.st-확정   { background: var(--green-light); color: var(--green); }
+.st-미확정 { background: var(--amber-light); color: var(--amber); }
+
+.money { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.money.neg { color: var(--red); font-weight: 800; }
+.money.zero { color: var(--text2); }
+tr.row-미납 td { background: rgba(220,38,38,0.05); }
+tr.row-부분납 td { background: rgba(245,158,11,0.05); }
+
+.fee-diff { color: var(--red); font-weight: 800; }
+.notice-doc {
+  max-width: 640px; margin: 0 auto 30px; padding: 34px 38px;
+  border: 2px solid #333; background: #fff; color: #000;
+  font-size: 13px; line-height: 1.85;
+}
+.notice-doc h2 { text-align: center; font-size: 21px; letter-spacing: 6px; margin-bottom: 6px; color: #000; }
+.notice-doc .doc-no { text-align: right; font-size: 11px; color: #555; margin-bottom: 18px; }
+.notice-doc table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 12px; }
+.notice-doc table th, .notice-doc table td { border: 1px solid #999; padding: 7px 9px; color: #000; }
+.notice-doc table th { background: #f1f3f5; font-weight: 700; }
+.notice-doc .sign { text-align: center; margin-top: 26px; font-size: 14px; font-weight: 700; letter-spacing: 2px; }
+@media print { .notice-doc { page-break-after: always; border: none; } }
+
 /* ===== 레이아웃: 백업 배너가 추가되며 하단이 잘리던 문제 ===== */
 html, body { height: 100%; }
 body { display: flex; flex-direction: column; }
@@ -754,6 +804,34 @@ body { display: flex; flex-direction: column; }
 </div>
 
 <div class="main">
+  <!-- [v51] 입금 등록 모달 -->
+  <div id="modal-payment" class="modal">
+    <div class="modal-content" style="max-width:460px">
+      <div class="modal-header">
+        <div class="modal-title">💰 입금 등록</div>
+        <span class="close" onclick="closePayModal()">&times;</span>
+      </div>
+      <div class="alert alert-info" style="margin-bottom:16px">
+        <b><span id="pm-ym"></span></b> · <b><span id="pm-house"></span></b><br>
+        부과 <b><span id="pm-billed"></span></b> · 기수납 <b><span id="pm-paid"></span></b> · 미납 <b style="color:var(--red)"><span id="pm-unpaid"></span></b>
+      </div>
+      <input type="hidden" id="pm-dong"><input type="hidden" id="pm-ho">
+      <div class="form-grid form-grid-2">
+        <div class="form-group"><label>입금액</label><input type="number" id="pm-amount"></div>
+        <div class="form-group"><label>입금일</label><input type="date" id="pm-date"></div>
+        <div class="form-group"><label>수단</label><select id="pm-method">
+          <option>계좌이체</option><option>현금</option><option>카드</option><option>관리비 합산</option><option>기타</option></select></div>
+        <div class="form-group"><label>메모</label><input type="text" id="pm-memo" placeholder="선택"></div>
+      </div>
+      <p style="font-size:11px;color:var(--text2);margin-top:10px">
+        일부만 입금됐다면 받은 금액만 적으세요. 나머지는 '부분납'으로 남습니다.</p>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closePayModal()">취소</button>
+        <button class="btn btn-primary" onclick="savePayment()">등록</button>
+      </div>
+    </div>
+  </div>
+
   <nav class="sidebar no-print">
     <span class="sidebar-label">메인 메뉴</span>
     <ul class="sidebar-menu">
@@ -773,10 +851,18 @@ body { display: flex; flex-direction: column; }
       <li><a onclick="showPage('lockercancel')" id="nav-lockercancel">📦 사물함 해지 관리</a></li>
     </ul>
     <div class="sidebar-divider"></div>
+    <span class="sidebar-label">월 마감 업무</span>
+    <ul class="sidebar-menu">
+      <li><a onclick="showPage('billing')" id="nav-billing">🧾 ① 부과 확정</a></li>
+      <li><a onclick="showPage('bill')" id="nav-bill">📄 ② 고지서 출력</a></li>
+      <li><a onclick="showPage('payment')" id="nav-payment">💰 ③ 수납 확인 <span id="nav-pay-badge" class="nav-badge" style="display:none"></span></a></li>
+      <li><a onclick="showPage('arrears')" id="nav-arrears">🚨 ④ 체납 독촉 <span id="nav-arr-badge" class="nav-badge" style="display:none"></span></a></li>
+    </ul>
+
+    <div class="sidebar-divider"></div>
     <span class="sidebar-label">조회 · 출력</span>
     <ul class="sidebar-menu">
       <li><a onclick="showPage('query')" id="nav-query">🔍 부과 통합 조회</a></li>
-      <li><a onclick="showPage('bill')" id="nav-bill">📄 고지서 출력</a></li>
       <li><a onclick="showPage('export')" id="nav-export">📥 엑셀 내보내기</a></li>
     </ul>
     <div class="sidebar-divider"></div>
@@ -1463,24 +1549,49 @@ body { display: flex; flex-direction: column; }
     <div id="page-dash" class="page active">
       <div id="dash-stat-grid" class="stat-grid"></div>
       <div class="card">
-        <div class="card-header"><div class="card-title">🛠️ v50 수정 내역 (v49의 실제 결함 수정)</div></div>
-       
-        <div style="line-height:1.9; margin-top:18px; padding-top:16px; border-top:1px solid var(--border)">
-          <p><b>v50에서 추가로 고친 것</b></p>
-          <p>• 관리업무센터를 드나들 때마다 대시보드에 카드가 <b>중복 누적</b>되던 문제</p>
-          <p>• 5초마다 화면 전체를 다시 그려 <b>체크박스 클릭이 씹히던</b> 문제 → 20초/해당 페이지에서만</p>
-          <p>• 리본 메뉴 클릭 시 <b>섹션 제목이 리본에 가려지던</b> 문제 (스크롤 대상이 window가 아니라 .content였음)</p>
-          <p>• 각 목록의 [수정] 버튼이 <b>입력 폼으로 스크롤되지 않던</b> 문제 (같은 원인)</p>
-          <p>• 법정점검 [완료] 처리 시 레코드가 <b>무한 증식</b>하던 문제 → 회차 롤오버 + 이력 분리</p>
-          <p>• 성명·메모에 <b>&lt; &gt; &amp; 문자</b>가 들어가면 표가 깨지던 문제</p>
-          <p>• 엑셀 일괄 업로드 시 <b>ID가 중복 생성</b>되어 수정/삭제가 엉뚱한 행에 걸리던 문제</p>
-          <p>• <b>시설 자산을 삭제할 방법이 없던</b> 문제 → 삭제 버튼 추가</p>
-          <p>• <b>우클릭 전면 차단</b> 제거 → 표의 전화번호 복사, 입력칸 붙여넣기 정상화</p>
-          <p>• [전체 세대 자동생성]이 <b>5라인 고정</b>이라 648세대가 640세대로 생성되던 문제 → 층·라인 직접 입력</p>
-          <p>• 환경설정 안내문이 <b>사실과 달랐던</b> 문제 (부과기준일은 헬스장에만 적용됨)</p>
-          <p>• 환경설정 비밀번호 <b>변경 기능</b> 추가, 저장공간 사용량 게이지 추가</p>
+        <div class="card-header"><div class="card-title">🆕 v51 신규 — 매달 반복되는 "부과 → 고지 → 수납확인 → 체납독촉"</div></div>
+        <div class="alert alert-info" style="margin-bottom:16px">
+         
+          <b></b> 왼쪽 [월 마감 업무] 메뉴에서 ①→②→③→④ 순서대로 진행하세요.
         </div>
-        
+        <div class="flow-steps" style="margin-bottom:18px">
+          <div class="flow-step" onclick="showPage('billing')"><b>① 부과 확정</b><small>금액을 고정</small></div>
+          <div class="flow-step" onclick="showPage('bill')"><b>② 고지서 출력</b><small>확정분 배부</small></div>
+          <div class="flow-step" onclick="showPage('payment')"><b>③ 수납 확인</b><small>입금 대사·분납</small></div>
+          <div class="flow-step" onclick="showPage('arrears')"><b>④ 체납 독촉</b><small>자동집계·독촉장</small></div>
+        </div>
+        <div style="line-height:1.9">
+          <p>• <b>부과 확정(스냅샷):</b> v50은 고지서를 뽑을 때마다 <b>'현재' 요금표로 다시 계산</b>했습니다.
+             요금을 올리면 <b>작년 고지서를 재출력해도 새 금액</b>이 찍혀, 입주민이 "그때 낸 금액과 다르다"고 해도 반박할 수 없었습니다.
+             이제 확정한 달은 금액이 <b>얼어붙어</b> 요금표를 바꿔도 변하지 않습니다.</p>
+          <p>• <b>요금표 이력:</b> 요금을 바꿀 때 <b>몇 월부터 적용</b>인지 함께 등록합니다(환경설정).
+             3월분은 3월 요금으로, 7월분은 7월 요금으로 계산됩니다.</p>
+          <p>• <b>시설별 부과기준일:</b> v50은 기준일이 <b>하나뿐이었고 헬스장에만</b> 적용됐습니다.
+             주차·사물함은 말일에 등록해도 그 달 요금이 전액 부과됐습니다.
+             이제 <b>헬스장 / 주차 / 사물함을 각각</b> 설정합니다(0 = 당월부터 부과).</p>
+          <p>• <b>수납 관리:</b> 세대별 입금 등록, <b>분납(여러 번 나눠 냄)</b>, 과납 감지, 수납률 집계.
+             확정 부과가 없는 달은 수납을 받지 않습니다(무엇을 얼마 받아야 하는지 정해지지 않았으므로).</p>
+          <p>• <b>체납 자동집계:</b> 확정된 모든 달의 <b>부과액 − 수납액</b>을 세대별로 자동 계산합니다. 손으로 적지 않습니다.
+             <b>독촉장</b>은 월별 미납 명세·납부기한·계좌가 들어간 서식으로 일괄 출력됩니다.</p>
+          <p>• <b>안전장치:</b> 수납 기록이 있는 달은 <b>확정 취소가 막힙니다.</b>
+             부과 확정·취소·수납 등록·삭제·요금표 변경·독촉장 출력은 <b>[환경설정 → 변경 이력]</b>에 남습니다.</p>
+          <p>• <b>백업 확장:</b> 부과 백업에 확정 내역·수납 기록·요금표 이력이 함께 담깁니다.</p>
+        </div>
+      </div>
+
+      <div class="card">
+       
+       
+        <div class="alert alert-warn" style="margin-top:18px">
+          <b>⚠️ 반드시 사용법에 대해 인지하시고 사용하시기바랍니다</b><br>
+          <b>1. 고지서는 출력 시점의 요금표로 재계산됩니다.</b> 요금을 인상하면 지난달 고지서를 다시 뽑을 때 인상된 금액이 나옵니다.
+          확정한 고지서는 반드시 엑셀/PDF로 즉시 보관하세요.<br>
+          <b>2. 부과는 있는데 수납(입금 확인) 기능이 없습니다.</b> 누가 냈는지 이 프로그램은 모릅니다. 체납 관리는 수기 입력입니다.<br>
+          <b>3. 데이터는 이 브라우저 안에만 있습니다.</b> 캐시 삭제·PC 교체·브라우저 재설치 시 복구 불가입니다.<br>
+          <b>4. 입주민 성명·전화번호·차량번호는 개인정보입니다.</b> 평문으로 저장되고 백업 JSON도 평문입니다.
+          PC 로그인 암호·화면 잠금·백업 파일 관리는 사용자 책임입니다.<br>
+          <b>5. 변경 이력이 남지 않습니다.</b> 누가 언제 무엇을 지웠는지 추적할 수 없습니다.
+        </div>
       </div>
     </div>
 
@@ -1586,7 +1697,118 @@ body { display: flex; flex-direction: column; }
       <div id="query-result"></div>
     </div>
 
+    <!-- ============================================================ -->
+    <!-- [v51 신규] ① 부과 확정                                        -->
+    <!-- ============================================================ -->
+    <div id="page-billing" class="page">
+      <div class="flow-steps no-print">
+        <div class="flow-step active" onclick="showPage('billing')"><b>① 부과 확정</b><small>이번 달 금액 확정</small></div>
+        <div class="flow-step" onclick="showPage('bill')"><b>② 고지서 출력</b><small>확정분 배부</small></div>
+        <div class="flow-step" onclick="showPage('payment')"><b>③ 수납 확인</b><small>입금 대사</small></div>
+        <div class="flow-step" onclick="showPage('arrears')"><b>④ 체납 독촉</b><small>미납 세대 통지</small></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">🧾 월별 부과 확정</div></div>
+        <div class="alert alert-info" style="margin-bottom:18px">
+          <b>부과를 확정하면 그 달의 금액이 고정됩니다.</b><br>
+          확정 이후에는 요금표를 인상하거나 인원이 늘어도 <b>확정한 달의 고지서 금액은 변하지 않습니다.</b>
+          고지서 배부 전에 반드시 확정하세요.
+        </div>
+        <div class="form-grid form-grid-3" style="margin-bottom:15px">
+          <div class="form-group"><label>부과 연월</label><input type="month" id="bg-month"></div>
+          <div class="form-group" style="display:flex;align-items:flex-end;gap:8px">
+            <button class="btn btn-outline" onclick="previewBilling()" style="flex:1">미리보기</button>
+          </div>
+          <div class="form-group" style="display:flex;align-items:flex-end">
+            <button class="btn btn-primary" onclick="confirmBilling(document.getElementById('bg-month').value)" style="flex:1">이 달 부과 확정</button>
+          </div>
+        </div>
+        <div id="billing-preview"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">📋 부과 확정 이력</div>
+          <button class="btn btn-blue btn-sm" onclick="exportBillingToExcel()">Excel 출력</button>
+        </div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr>
+          <th>부과월</th><th>확정일시</th><th>세대수</th><th class="money">헬스장</th><th class="money">주차</th>
+          <th class="money">사물함</th><th class="money">부과총액</th><th class="money">수납액</th><th class="money">미납액</th><th>적용요금표</th><th class="no-print">관리</th>
+        </tr></thead><tbody id="billing-hist-body"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- [v51 신규] ③ 수납 확인                                        -->
+    <!-- ============================================================ -->
+    <div id="page-payment" class="page">
+      <div class="flow-steps no-print">
+        <div class="flow-step" onclick="showPage('billing')"><b>① 부과 확정</b><small>이번 달 금액 확정</small></div>
+        <div class="flow-step" onclick="showPage('bill')"><b>② 고지서 출력</b><small>확정분 배부</small></div>
+        <div class="flow-step active" onclick="showPage('payment')"><b>③ 수납 확인</b><small>입금 대사</small></div>
+        <div class="flow-step" onclick="showPage('arrears')"><b>④ 체납 독촉</b><small>미납 세대 통지</small></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">💰 수납 확인</div></div>
+        <div class="form-grid form-grid-4" style="margin-bottom:12px">
+          <div class="form-group"><label>부과 연월</label><input type="month" id="pay-month" onchange="renderPaymentPage()"></div>
+          <div class="form-group"><label>동</label><select id="pay-dong" onchange="renderPaymentPage()"><option value="">전체</option></select></div>
+          <div class="form-group"><label>상태</label><select id="pay-status" onchange="renderPaymentPage()">
+            <option value="">전체</option><option value="미납">미납</option><option value="부분납">부분납</option>
+            <option value="완납">완납</option><option value="과납">과납</option></select></div>
+          <div class="form-group"><label>동·호·성명 검색</label><input type="text" id="pay-search" placeholder="검색어" onkeyup="renderPaymentPage()"></div>
+        </div>
+        <div id="pay-summary"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0" class="no-print">
+          <button class="btn btn-blue btn-sm" onclick="exportPaymentToExcel()">Excel 출력</button>
+          <button class="btn btn-outline btn-sm" onclick="bulkFullPay()">표시된 미납 세대 일괄 완납 처리</button>
+        </div>
+        <div id="pay-result"></div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- [v51 신규] ④ 체납 독촉                                        -->
+    <!-- ============================================================ -->
+    <div id="page-arrears" class="page">
+      <div class="flow-steps no-print">
+        <div class="flow-step" onclick="showPage('billing')"><b>① 부과 확정</b><small>이번 달 금액 확정</small></div>
+        <div class="flow-step" onclick="showPage('bill')"><b>② 고지서 출력</b><small>확정분 배부</small></div>
+        <div class="flow-step" onclick="showPage('payment')"><b>③ 수납 확인</b><small>입금 대사</small></div>
+        <div class="flow-step active" onclick="showPage('arrears')"><b>④ 체납 독촉</b><small>미납 세대 통지</small></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">🚨 체납 현황 (확정 부과 기준 자동 집계)</div></div>
+        <div class="alert alert-info" style="margin-bottom:16px">
+          확정된 모든 월의 <b>부과액 − 수납액</b>을 세대별로 자동 집계한 결과입니다. 손으로 입력하지 않습니다.<br>
+          금액이 맞지 않으면 [③ 수납 확인]에서 입금 기록을 먼저 맞춰주세요.
+        </div>
+        <div class="form-grid form-grid-3" style="margin-bottom:12px">
+          <div class="form-group"><label>기준월 (이 달까지 집계)</label><input type="month" id="arr2-asof" onchange="renderArrearsPage()"></div>
+          <div class="form-group"><label>최소 체납 개월</label><select id="arr2-months" onchange="renderArrearsPage()">
+            <option value="1">1개월 이상</option><option value="2">2개월 이상</option>
+            <option value="3">3개월 이상</option><option value="6">6개월 이상</option></select></div>
+          <div class="form-group"><label>동·호·성명 검색</label><input type="text" id="arr2-search" placeholder="검색어" onkeyup="renderArrearsPage()"></div>
+        </div>
+        <div id="arr2-summary"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0" class="no-print">
+          <button class="btn btn-blue btn-sm" onclick="exportArrears2ToExcel()">Excel 출력</button>
+          <button class="btn btn-red btn-sm" onclick="printAllNotices()">표시된 세대 독촉장 일괄 출력</button>
+        </div>
+        <div id="arr2-result"></div>
+      </div>
+    </div>
+
     <div id="page-bill" class="page">
+      <div class="flow-steps no-print">
+        <div class="flow-step" onclick="showPage('billing')"><b>① 부과 확정</b><small>이번 달 금액 확정</small></div>
+        <div class="flow-step active" onclick="showPage('bill')"><b>② 고지서 출력</b><small>확정분 배부</small></div>
+        <div class="flow-step" onclick="showPage('payment')"><b>③ 수납 확인</b><small>입금 대사</small></div>
+        <div class="flow-step" onclick="showPage('arrears')"><b>④ 체납 독촉</b><small>미납 세대 통지</small></div>
+      </div>
+      <div id="bill-confirm-state" class="no-print"></div>
       <div class="card no-print">
         <div class="card-header"><div class="card-title">📄 고지서 출력</div></div>
         <div class="form-grid form-grid-3">
@@ -1676,7 +1898,20 @@ body { display: flex; flex-direction: column; }
           <div class="form-group"><label>기본 대수</label><input type="number" id="s-park-base"></div>
           <div class="form-group"><label>추가 대수당</label><input type="number" id="s-park-add"></div>
           <div class="form-group"><label>사물함 이용료(개당)</label><input type="number" id="s-locker-fee"></div>
-          <div class="form-group"><label>부과 기준일</label><input type="number" id="s-cut-day" placeholder="20"></div>
+          <div class="form-group"></div><div class="form-group"></div>
+        </div>
+
+        <!-- [v51] 부과기준일을 시설별로 분리 -->
+        <div class="card-header" style="margin-top:22px"><div class="card-title">📅 부과 기준일 (시설별 개별 설정)</div></div>
+        <div class="alert alert-info" style="margin-bottom:14px">
+          <b>기준일을 넘겨 등록한 세대는 다음 달부터 부과</b>합니다. <b>0으로 두면 등록한 달부터 바로 부과</b>합니다.<br>
+          예) 헬스장 기준일 20 → 7월 21일에 등록하면 8월분부터 부과 / 7월 20일에 등록하면 7월분부터 부과<br>
+          <span style="color:var(--red);font-weight:700">※ v50까지는 이 값이 하나뿐이었고 헬스장에만 적용됐습니다. 주차·사물함은 기준일이 없었습니다(=0).</span>
+        </div>
+        <div class="form-grid form-grid-3">
+          <div class="form-group"><label>🏃 헬스장 기준일</label><input type="number" id="s-gym-cut" min="0" max="31" placeholder="0 = 당월부터"></div>
+          <div class="form-group"><label>🚗 주차 기준일</label><input type="number" id="s-park-cut" min="0" max="31" placeholder="0 = 당월부터"></div>
+          <div class="form-group"><label>📦 사물함 기준일</label><input type="number" id="s-locker-cut" min="0" max="31" placeholder="0 = 당월부터"></div>
         </div>
         <div class="form-grid form-grid-2" style="margin-top:15px">
           <div class="form-group"><label>입금 계좌</label><input type="text" id="s-bank"></div>
@@ -1688,6 +1923,42 @@ body { display: flex; flex-direction: column; }
         </div>
         <div id="settings-summary" class="alert alert-info" style="margin-top:20px"></div>
       </div>
+      <!-- [v51 신규] 요금표 이력 -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">💵 요금표 이력 (요금 인상·인하 관리)</div></div>
+        <div class="alert alert-warn" style="margin-bottom:16px">
+          <b>왜 필요한가:</b> v50까지는 고지서를 뽑을 때마다 <b>'현재' 요금표로 다시 계산</b>했습니다.
+          헬스장을 1만원 → 1.5만원으로 올리면 <b>작년 1월 고지서를 재출력해도 1.5만원</b>이 찍혔습니다.
+          입주민이 "그때 낸 금액과 다르다"고 하면 반박할 근거가 없었습니다.<br>
+          <b>이제:</b> 요금을 바꿀 때 <b>몇 월부터 적용인지</b>를 함께 등록하세요. 각 달의 부과액은 그 달에 유효했던 요금표로 계산됩니다.
+          <b>이미 확정한 부과는 요금표를 바꿔도 절대 변하지 않습니다.</b>
+        </div>
+        <div class="form-grid form-grid-3" style="margin-bottom:12px">
+          <div class="form-group"><label>적용 시작 연월</label><input type="month" id="fee-effect"></div>
+          <div class="form-group" style="grid-column:span 2"><label>사유 / 근거 (입대위 의결 등)</label><input type="text" id="fee-memo" placeholder="예: 2026-06-15 입주자대표회의 의결"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+          <button class="btn btn-primary" onclick="saveFeeRevision()">현재 설정값을 이 연월부터 적용</button>
+          <button class="btn btn-outline" onclick="renderFeeHistory()">새로고침</button>
+        </div>
+        <p style="font-size:11px;color:var(--text2);margin-bottom:14px">
+          위 [부과 금액] · [부과 기준일] 칸을 원하는 값으로 고친 뒤 이 버튼을 누르면, 그 값이 해당 연월부터 적용되는 요금표로 보관됩니다.</p>
+        <div id="fee-hist"></div>
+      </div>
+
+      <!-- [v51 신규] 변경 이력 -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">📜 변경 이력 (최근 500건)</div>
+          <button class="btn btn-outline btn-sm" onclick="renderAuditLog()">새로고침</button>
+        </div>
+        <div class="alert alert-info" style="margin-bottom:14px">
+          v50까지는 <b>누가 언제 무엇을 지웠는지 기록이 전혀 없었습니다.</b>
+          부과 확정·확정 취소·수납 등록·수납 삭제·요금표 변경·독촉장 출력이 여기 남습니다.<br>
+          <span style="color:var(--text2)">※ 이 프로그램은 로그인이 없어 '누가'는 기록하지 못합니다. PC 단위로만 남습니다.</span>
+        </div>
+        <div id="audit-list" style="max-height:320px;overflow-y:auto"></div>
+      </div>
+
       <div class="card"><div class="card-header"><div class="card-title">📥 데이터 백업 및 복구</div></div>
         <div class="alert alert-warn" style="margin-bottom:15px">
           <b>백업 파일은 두 종류입니다. 섞어서 넣지 마세요.</b><br>
@@ -1874,10 +2145,308 @@ let gymData = JSON.parse(localStorage.getItem(KEYS.GYM) || '[]');
 let parkData = JSON.parse(localStorage.getItem(KEYS.PARK) || '[]');
 let lockerData = JSON.parse(localStorage.getItem(KEYS.LOCKER) || '[]');
 let dbData = JSON.parse(localStorage.getItem(KEYS.DB) || '[]');
-let cfg = JSON.parse(localStorage.getItem(KEYS.CFG) || '{"gymFee":10000,"gymAdd":5000,"gymBase":2,"parkFee":30000,"parkAdd":50000,"parkBase":2,"lockerFee":3000,"cutDay":20,"bank":"농협 000-0000-0000-00","phone":"054-000-0000","buildings":8,"households":648}');
+/* ============================================================================
+   [v51] 요금 정책 기본값
+   v50까지는 부과기준일(cutDay)이 딱 하나뿐이었고, 그마저도 헬스장 계산에만
+   쓰였다. 주차·사물함은 등록일이 말일이어도 무조건 당월부터 부과됐다.
+   → 시설별로 각각 설정할 수 있게 분리한다. 0 = 당월부터 부과(기준일 없음).
+   ============================================================================ */
+const DEFAULT_CFG = {
+  gymFee: 10000, gymAdd: 5000, gymBase: 2, gymCutDay: 20,
+  parkFee: 30000, parkAdd: 50000, parkBase: 2, parkCutDay: 0,
+  lockerFee: 3000, lockerCutDay: 0,
+  bank: '농협 000-0000-0000-00', phone: '054-000-0000',
+  buildings: 8, households: 648
+};
+let cfg = migrateCfg(JSON.parse(localStorage.getItem(KEYS.CFG) || '{}'));
+
+function migrateCfg(c) {
+  const out = Object.assign({}, DEFAULT_CFG, c || {});
+  /* v50 이하 → v51 이관: 단일 cutDay 는 헬스장 기준일이었다.
+     주차/사물함은 실제로 기준일이 적용된 적이 없으므로 0(당월부터)으로 둔다.
+     이렇게 해야 기존 부과 결과가 바뀌지 않는다. */
+  if (c && c.cutDay !== undefined && c.gymCutDay === undefined) {
+    out.gymCutDay = Number(c.cutDay) || 0;
+    out.parkCutDay = 0;
+    out.lockerCutDay = 0;
+  }
+  delete out.cutDay;
+  ['gymFee','gymAdd','gymBase','gymCutDay','parkFee','parkAdd','parkBase','parkCutDay','lockerFee','lockerCutDay','buildings','households']
+    .forEach(k => { out[k] = Number(out[k]) || 0; });
+  return out;
+}
 
 // 동 배열: cfg.buildings 기반으로 동적 생성 (101, 102, ..., 1xx)
 let DONGS = [];
+/* ============================================================================
+   [v51 신규] 요금표 이력 (Fee Schedule History)
+   ----------------------------------------------------------------------------
+   v50까지의 치명적 문제: 고지서를 뽑을 때마다 '현재' 요금표로 다시 계산했다.
+   헬스장을 1만원 → 1.5만원으로 올리면, 작년 1월 고지서를 재출력해도
+   1.5만원이 찍혔다. 입주민이 "그때 낸 금액과 다르다"고 하면 반박할 근거가
+   없었다.
+   → 요금은 '언제부터 적용'인지를 함께 기록한다. 특정 월의 부과액은 항상
+     그 월에 유효했던 요금표로 계산한다.
+   ============================================================================ */
+const FEE_KEY = 'apt_fee_history_v51';
+const FEE_FIELDS = ['gymFee','gymAdd','gymBase','gymCutDay','parkFee','parkAdd','parkBase','parkCutDay','lockerFee','lockerCutDay'];
+
+function getFeeHistory() {
+  let arr;
+  try { arr = JSON.parse(localStorage.getItem(FEE_KEY) || '[]'); } catch (e) { arr = []; }
+  if (!Array.isArray(arr)) arr = [];
+  return arr.sort((a, b) => b.effectYm.localeCompare(a.effectYm));   /* 최신 적용월이 앞 */
+}
+function saveFeeHistory(arr) { safeSet(FEE_KEY, JSON.stringify(arr)); }
+
+/* cfg → 요금표 레코드 형태로 변환 */
+function cfgToFee() {
+  const f = {};
+  FEE_FIELDS.forEach(k => { f[k] = Number(cfg[k]) || 0; });
+  return f;
+}
+
+/* 해당 연월(ym)에 적용되는 요금표를 반환.
+   이력이 하나도 없거나 ym 이전 이력이 없으면 현재 환경설정 값을 쓴다. */
+function getFeeAt(ym) {
+  const hist = getFeeHistory();
+  const rec = hist.find(r => r.effectYm <= ym);
+  if (!rec) return Object.assign(cfgToFee(), { effectYm: null, _fallback: true });
+  const f = {};
+  FEE_FIELDS.forEach(k => { f[k] = Number(rec[k]) || 0; });
+  f.effectYm = rec.effectYm; f.memo = rec.memo || ''; f.id = rec.id;
+  return f;
+}
+
+/* 요금표 개정 등록 */
+function addFeeRevision(effectYm, feeObj, memo) {
+  const hist = getFeeHistory();
+  if (hist.some(r => r.effectYm === effectYm)) {
+    if (!confirm(`${effectYm} 적용 요금표가 이미 있습니다.\n덮어쓰시겠습니까?`)) return false;
+    const i = hist.findIndex(r => r.effectYm === effectYm);
+    hist.splice(i, 1);
+  }
+  const rec = { id: uid(), effectYm: effectYm, memo: memo || '', createdAt: new Date().toISOString() };
+  FEE_FIELDS.forEach(k => { rec[k] = Number(feeObj[k]) || 0; });
+  hist.push(rec);
+  saveFeeHistory(hist);
+  auditLog('요금표', `${effectYm} 적용 요금표 등록`, memo || '');
+  return true;
+}
+
+function deleteFeeRevision(id) {
+  const hist = getFeeHistory();
+  const rec = hist.find(r => r.id == id);
+  if (!rec) return;
+  /* 이미 확정된 부과가 이 요금표를 썼다면 지워도 확정분은 안전하다
+     (확정 시 스냅샷을 별도 저장하므로). 그래도 경고는 한다. */
+  const used = getBillings().filter(b => b.feeSnapshot && b.feeSnapshot.effectYm === rec.effectYm);
+  let msg = `${rec.effectYm} 적용 요금표를 삭제하시겠습니까?`;
+  if (used.length) msg += `\n\n※ 확정된 부과 ${used.length}건이 이 요금표로 산출되었습니다.\n` +
+                          `확정분은 별도 보관되므로 금액이 바뀌지는 않지만,\n미확정 월의 계산 결과는 달라집니다.`;
+  if (!confirm(msg)) return;
+  saveFeeHistory(hist.filter(r => r.id != id));
+  auditLog('요금표', `${rec.effectYm} 적용 요금표 삭제`, '');
+  renderFeeHistory();
+}
+
+/* ============================================================================
+   [v51 신규] 감사 로그
+   v50까지는 누가 언제 무엇을 지웠는지 흔적이 전혀 없었다.
+   ============================================================================ */
+const AUDIT_KEY = 'apt_audit_v51';
+function auditLog(cat, action, detail) {
+  try {
+    let arr = JSON.parse(localStorage.getItem(AUDIT_KEY) || '[]');
+    arr.push({ at: new Date().toISOString(), cat: cat, action: action, detail: detail || '' });
+    if (arr.length > 500) arr = arr.slice(-500);   /* 저장공간 보호 */
+    safeSet(AUDIT_KEY, JSON.stringify(arr));
+  } catch (e) { console.warn('audit fail', e); }
+}
+function getAuditLog() {
+  try { return JSON.parse(localStorage.getItem(AUDIT_KEY) || '[]').reverse(); } catch (e) { return []; }
+}
+
+
+/* ============================================================================
+   [v51 신규] 부과 확정 (Billing Confirmation)
+   ----------------------------------------------------------------------------
+   v50까지의 구조적 결함: '부과'라는 확정 행위 자체가 없었다.
+   화면에 보이는 금액은 매번 즉석에서 계산된 값이라, 등록 인원이 바뀌거나
+   요금을 올리면 지난달 고지서까지 소급해서 금액이 변했다.
+   → 월별로 '확정'을 하고, 확정 시점의 부과 내역과 요금표를 통째로 얼려서
+     보관한다. 확정 이후의 고지서·수납·체납은 전부 이 스냅샷을 기준으로 한다.
+   ============================================================================ */
+const BILL_KEY = 'apt_billing_v51';
+
+function getBillings() {
+  try {
+    const a = JSON.parse(localStorage.getItem(BILL_KEY) || '[]');
+    return Array.isArray(a) ? a.sort((x, y) => y.ym.localeCompare(x.ym)) : [];
+  } catch (e) { return []; }
+}
+function saveBillings(arr) { safeSet(BILL_KEY, JSON.stringify(arr)); }
+function getBilling(ym) { return getBillings().find(b => b.ym === ym) || null; }
+function isConfirmed(ym) { return !!getBilling(ym); }
+
+/* 확정: 현재 등록 현황 + 해당 월 요금표로 계산한 결과를 스냅샷으로 굳힌다 */
+function confirmBilling(ym) {
+  if (!ym) { alert('부과할 연월을 선택하세요.'); return; }
+  if (getBilling(ym)) { alert(`${ym} 부과는 이미 확정되어 있습니다.\n금액을 바꾸려면 먼저 [확정 취소]를 하세요.`); return; }
+
+  const r = computeBilling(ym);
+  if (!r.houses.length) { alert(`${ym}에 부과할 세대가 없습니다.\n등록 내역과 부과기준일 설정을 확인하세요.`); return; }
+
+  let warn = '';
+  if (r.fee._fallback) {
+    warn = '\n\n⚠️ 이 달에 적용할 요금표 이력이 없어 [환경설정]의 현재 요금으로 계산했습니다.\n' +
+           '   확정과 동시에 이 요금표가 스냅샷으로 보관되므로 이후 요금을 바꿔도 안전합니다.';
+  }
+  const msg = `${ym} 부과를 확정하시겠습니까?\n\n` +
+              `· 대상 세대: ${r.houses.length}세대\n` +
+              `· 헬스장 ${r.gTotal.toLocaleString()}원 / 주차 ${r.pTotal.toLocaleString()}원 / 사물함 ${r.lTotal.toLocaleString()}원\n` +
+              `· 부과 총액: ${r.total.toLocaleString()}원\n` +
+              `· 적용 요금표: ${r.fee.effectYm ? r.fee.effectYm + ' 개정분' : '환경설정 현재값'}\n\n` +
+              `확정하면 이 금액이 고정됩니다. 이후 요금표를 바꾸거나 인원이 늘어도\n${ym} 고지서 금액은 변하지 않습니다.` + warn;
+  if (!confirm(msg)) return;
+
+  const snap = {
+    ym: ym,
+    confirmedAt: new Date().toISOString(),
+    feeSnapshot: JSON.parse(JSON.stringify(r.fee)),
+    total: r.total, gTotal: r.gTotal, pTotal: r.pTotal, lTotal: r.lTotal,
+    items: r.houses.map(v => ({
+      key: v.key, dong: v.dong, ho: v.ho, name: v.name || '',
+      gc: v.gc, pc: v.pc, lc: v.lc,
+      g: v.g, p: v.p, l: v.l, total: v.total,
+      members: v.members.map(m => ({ type: m.type, name: m.name, member: m.member, phone: m.phone, carnum: m.carnum || '' }))
+    }))
+  };
+  const arr = getBillings(); arr.push(snap); saveBillings(arr);
+  auditLog('부과확정', `${ym} 부과 확정`, `${r.houses.length}세대 / ${r.total.toLocaleString()}원`);
+  alert(`✅ ${ym} 부과가 확정되었습니다.\n\n다음 단계: [② 고지서 출력] → 배부 → [③ 수납 확인]`);
+  renderBillingPage();
+}
+
+/* 확정 취소: 수납이 한 건이라도 있으면 막는다 */
+function cancelBilling(ym) {
+  const b = getBilling(ym); if (!b) return;
+  const pays = getPayments().filter(p => p.ym === ym);
+  if (pays.length) {
+    alert(`❌ ${ym}에 이미 수납 기록이 ${pays.length}건 있어 확정을 취소할 수 없습니다.\n\n` +
+          `수납액 합계: ${pays.reduce((a, p) => a + Number(p.amount || 0), 0).toLocaleString()}원\n\n` +
+          `먼저 [③ 수납 확인]에서 해당 월 수납 기록을 삭제하세요.\n` +
+          `(입금이 실제로 있었다면 취소해서는 안 됩니다)`);
+    return;
+  }
+  if (!confirm(`${ym} 부과 확정을 취소하시겠습니까?\n\n` +
+               `· 확정 부과액 ${b.total.toLocaleString()}원 / ${b.items.length}세대\n` +
+               `· 배부한 고지서가 있다면 금액이 달라질 수 있습니다.\n` +
+               `· 이 작업은 기록에 남습니다.`)) return;
+  saveBillings(getBillings().filter(x => x.ym !== ym));
+  auditLog('부과확정', `${ym} 부과 확정 취소`, `${b.total.toLocaleString()}원`);
+  alert(`${ym} 확정이 취소되었습니다.`);
+  renderBillingPage();
+}
+
+/* ============================================================================
+   [v51 신규] 수납 관리 (Payments)
+   ----------------------------------------------------------------------------
+   v50까지: 부과는 하는데 '누가 냈는지'를 기록할 곳이 없었다.
+   체납 모듈은 있었지만 직원이 금액을 손으로 적어 넣는 메모장이었다.
+   → 부과 스냅샷에 입금 기록을 붙인다. 분납(여러 번 나눠 냄)도 지원한다.
+   ============================================================================ */
+const PAY_KEY = 'apt_payments_v51';
+const PAY_METHODS = ['계좌이체', '현금', '카드', '관리비 합산', '기타'];
+
+function getPayments() {
+  try { const a = JSON.parse(localStorage.getItem(PAY_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+function savePayments(arr) { safeSet(PAY_KEY, JSON.stringify(arr)); }
+
+function addPayment(ym, dong, ho, amount, payDate, method, memo) {
+  const arr = getPayments();
+  arr.push({ id: uid(), ym: ym, dong: dong, ho: ho, amount: Number(amount) || 0,
+             payDate: payDate || todayStr(), method: method || '계좌이체',
+             memo: memo || '', createdAt: new Date().toISOString() });
+  savePayments(arr);
+  auditLog('수납', `${ym} ${dong}동 ${ho}호 수납 등록`, `${Number(amount).toLocaleString()}원 / ${method}`);
+}
+
+function deletePayment(id) {
+  const arr = getPayments();
+  const p = arr.find(x => x.id == id); if (!p) return;
+  if (!confirm(`수납 기록을 삭제하시겠습니까?\n\n` +
+               `${p.ym} · ${p.dong}동 ${p.ho}호 · ${Number(p.amount).toLocaleString()}원 (${p.payDate})\n\n` +
+               `실제 입금이 있었다면 삭제하지 마세요. 삭제 기록은 남습니다.`)) return;
+  savePayments(arr.filter(x => x.id != id));
+  auditLog('수납', `${p.ym} ${p.dong}동 ${p.ho}호 수납 삭제`, `${Number(p.amount).toLocaleString()}원`);
+  renderPaymentPage();
+}
+
+/* 특정 월의 세대별 수납 현황 = 확정 부과 스냅샷 ⨝ 수납 기록 */
+function getReceiptStatus(ym) {
+  const b = getBilling(ym);
+  if (!b) return null;
+  const pays = getPayments().filter(p => p.ym === ym);
+  return b.items.map(it => {
+    const mine = pays.filter(p => p.dong === it.dong && p.ho === it.ho);
+    const paid = mine.reduce((a, p) => a + Number(p.amount || 0), 0);
+    const unpaid = it.total - paid;
+    let st;
+    if (it.total === 0) st = '부과없음';
+    else if (paid === 0) st = '미납';
+    else if (unpaid > 0) st = '부분납';
+    else if (unpaid === 0) st = '완납';
+    else st = '과납';
+    return Object.assign({}, it, { paid: paid, unpaid: unpaid, status: st, pays: mine,
+                                   lastPayDate: mine.length ? mine.map(p => p.payDate).sort().pop() : '' });
+  }).sort(sortHouse);
+}
+
+/* ============================================================================
+   [v51 신규] 체납 집계 (Arrears)
+   ----------------------------------------------------------------------------
+   확정된 전체 월을 훑어 세대별 미납을 자동 집계한다.
+   v50의 수기 체납 모듈(office_arrears)은 그대로 두되, 이쪽이 정본이다.
+   ============================================================================ */
+function getArrearsSummary(asOfYm) {
+  const bills = getBillings().filter(b => !asOfYm || b.ym <= asOfYm);
+  const pays = getPayments();
+  const map = {};
+  bills.forEach(b => {
+    b.items.forEach(it => {
+      if (it.total <= 0) return;
+      const k = it.dong + '-' + it.ho;
+      if (!map[k]) map[k] = { dong: it.dong, ho: it.ho, name: it.name, billed: 0, paid: 0, unpaid: 0, months: 0, detail: [], lastPayDate: '' };
+      const m = map[k];
+      if (it.name) m.name = it.name;
+      const mine = pays.filter(p => p.ym === b.ym && p.dong === it.dong && p.ho === it.ho);
+      const paid = mine.reduce((a, p) => a + Number(p.amount || 0), 0);
+      const unpaid = it.total - paid;
+      m.billed += it.total; m.paid += paid;
+      if (unpaid > 0) { m.unpaid += unpaid; m.months++; m.detail.push({ ym: b.ym, billed: it.total, paid: paid, unpaid: unpaid }); }
+      const lp = mine.map(p => p.payDate).sort().pop();
+      if (lp && lp > m.lastPayDate) m.lastPayDate = lp;
+    });
+  });
+  return Object.values(map).filter(m => m.unpaid > 0)
+    .map(m => { m.detail.sort((a, b) => a.ym.localeCompare(b.ym)); return m; })
+    .sort((a, b) => b.unpaid - a.unpaid || sortHouse(a, b));
+}
+
+/* 세대 연락처 (독촉장용) — 세대DB에서 우선 조회, 없으면 부과 내역의 등록자 */
+function findContact(dong, ho) {
+  const d = dbData.find(x => x.dong === dong && x.ho === ho);
+  if (d) return { name: d.name || '', phone: d.phone || '' };
+  for (const src of [gymData, parkData, lockerData]) {
+    const r = src.find(x => x.dong === dong && x.ho === ho);
+    if (r) return { name: r.name || '', phone: r.phone || '' };
+  }
+  return { name: '', phone: '' };
+}
+
 function rebuildDongs() {
   const n = cfg.buildings || 8;
   DONGS = Array.from({ length: n }, (_, i) => String(101 + i));
@@ -1929,6 +2498,11 @@ function showPage(name) {
   if (name === 'lockercancel') renderCancelList('locker');
   if (name === 'db') renderDB();
   if (name === 'office') { renderSchedule(); renderArrears(); renderInspection(); renderCivil(); renderInventory(); initAiDoc(); initTemplateApp(); initLegalInspection(); initAssetApp(); initRibbonDashboard(); }
+  if (name === 'billing') initBillingPage();
+  if (name === 'payment') initPaymentPage();
+  if (name === 'arrears') initArrearsPage();
+  if (name === 'settings') { renderFeeHistory(); renderAuditLog(); }
+  if (name === 'bill') renderBillConfirmState();
 }
 
 function openSettingsAuth() {
@@ -1956,17 +2530,72 @@ function confirmSettingsPw() {
   }
 }
 
-function isActive(item, ym, isGym = false) {
+/* [v51] 부과 시작월 판정
+   - 기준일은 시설별로 따로 적용한다 (v50: 헬스장에만, 그것도 하나뿐이었음)
+   - 기준일은 '그 달에 유효했던 요금표'의 값을 쓴다 (v50: 항상 현재값)
+   type: 'gym' | 'park' | 'locker'   (구버전 호환: true → 'gym') */
+function billStartYm(item, type, fee) {
   const startYm = item.date.slice(0, 7);
-  if (isGym) {
-    const d = parseInt(item.date.slice(8, 10));
-    let sYm = startYm; if (d > cfg.cutDay) {
-      let [y, m] = startYm.split('-').map(Number); m++; if (m > 12) { m = 1; y++; } sYm = `${y}-${String(m).padStart(2, '0')}`;
-    }
-    if (ym < sYm) return false;
-  } else { if (ym < startYm) return false; }
+  const cut = Number(fee[type + 'CutDay']) || 0;
+  if (cut <= 0) return startYm;                       /* 0 = 당월부터 부과 */
+  const d = parseInt(item.date.slice(8, 10), 10);
+  if (!(d > cut)) return startYm;
+  let [y, m] = startYm.split('-').map(Number);
+  m++; if (m > 12) { m = 1; y++; }
+  return `${y}-${String(m).padStart(2, '0')}`;
+}
+
+function isActive(item, ym, type, fee) {
+  if (type === true) type = 'gym';
+  if (!type) type = 'park';
+  if (!fee) fee = getFeeAt(ym);
+  if (ym < billStartYm(item, type, fee)) return false;
   if (!item.cancelDate) return true;
-  return ym <= item.cancelDate.slice(0, 7);
+  return ym <= item.cancelDate.slice(0, 7);          /* 해지월까지는 부과 */
+}
+
+/* ============================================================================
+   [v51 신규] 부과 산출 공통 함수
+   v50까지는 통합조회·고지서가 완전히 똑같은 계산식을 각자 복사해 갖고 있었다.
+   한쪽만 고치면 두 화면의 금액이 달라진다. 하나로 합친다.
+   ============================================================================ */
+function calcHouseFee(v, fee) {
+  const g = v.gc <= 0 ? 0 : (v.gc <= fee.gymBase ? fee.gymFee : fee.gymFee + (v.gc - fee.gymBase) * fee.gymAdd);
+  const p = v.pc <= 0 ? 0 : (v.pc <= fee.parkBase ? fee.parkFee : fee.parkFee + (v.pc - fee.parkBase) * fee.parkAdd);
+  const l = v.lc * fee.lockerFee;
+  return { g: g, p: p, l: l, total: g + p + l };
+}
+
+function computeBilling(ym, dongFilter, hoFilter, typeFilter) {
+  const fee = getFeeAt(ym);
+  const d = dongFilter || '', h = (hoFilter || '').trim();
+  const pick = (arr, type) => (typeFilter && typeFilter !== type) ? []
+        : arr.filter(r => isActive(r, ym, type, fee) && (!d || r.dong === d) && (!h || r.ho === h));
+  const gyms = pick(gymData, 'gym'), parks = pick(parkData, 'park'), lockers = pick(lockerData, 'locker');
+  const house = {};
+  const touch = (r) => {
+    const k = r.dong + '-' + r.ho;
+    if (!house[k]) house[k] = { key: k, dong: r.dong, ho: r.ho, name: r.name, gc: 0, pc: 0, lc: 0, members: [] };
+    return house[k];
+  };
+  gyms.forEach(r => { const v = touch(r); v.gc++; v.members.push({ type: '헬스장', name: r.name, member: r.member, phone: r.phone, id: r.id }); });
+  parks.forEach(r => { const v = touch(r); v.pc++; v.members.push({ type: '주차', name: r.name, member: r.member, phone: r.phone, id: r.id, carnum: r.carnum }); });
+  lockers.forEach(r => { const v = touch(r); v.lc++; v.members.push({ type: '사물함', name: r.name, member: r.member, phone: r.phone, id: r.id }); });
+  const houses = Object.values(house).map(v => {
+    const f = calcHouseFee(v, fee);
+    v.g = f.g; v.p = f.p; v.l = f.l; v.total = f.total;
+    if (!v.name && v.members.length) v.name = v.members[0].name;
+    return v;
+  }).sort(sortHouse);
+  return { ym: ym, fee: fee, houses: houses,
+           gTotal: houses.reduce((a, v) => a + v.g, 0),
+           pTotal: houses.reduce((a, v) => a + v.p, 0),
+           lTotal: houses.reduce((a, v) => a + v.l, 0),
+           total: houses.reduce((a, v) => a + v.total, 0) };
+}
+
+function sortHouse(a, b) {
+  return a.dong === b.dong ? ((parseInt(a.ho) || 0) - (parseInt(b.ho) || 0)) : String(a.dong).localeCompare(String(b.dong));
 }
 
 function addItem(type) {
@@ -2125,28 +2754,29 @@ function runIntegratedQuery() {
   const h = document.getElementById('q-ho').value.trim();
   const typeFilter = document.getElementById('q-type').value; // 'gym'|'park'|'locker'|''
   if (!ym) { alert('연월을 선택하세요.'); return; }
-  const gyms   = typeFilter && typeFilter !== 'gym'    ? [] : gymData.filter(r => isActive(r, ym, true) && (!d || r.dong === d) && (!h || r.ho === h));
-  const parks  = typeFilter && typeFilter !== 'park'   ? [] : parkData.filter(r => isActive(r, ym) && (!d || r.dong === d) && (!h || r.ho === h));
-  const lockers= typeFilter && typeFilter !== 'locker' ? [] : lockerData.filter(r => isActive(r, ym) && (!d || r.dong === d) && (!h || r.ho === h));
-  const house = {};
-  gyms.forEach(r => { const k = r.dong + '-' + r.ho; if (!house[k]) house[k] = { dong: r.dong, ho: r.ho, gc: 0, pc: 0, lc: 0, members: [] }; house[k].gc++; house[k].members.push({ type: '헬스장', name: r.name, member: r.member, phone: r.phone, id: r.id }); });
-  parks.forEach(r => { const k = r.dong + '-' + r.ho; if (!house[k]) house[k] = { dong: r.dong, ho: r.ho, gc: 0, pc: 0, lc: 0, members: [] }; house[k].pc++; house[k].members.push({ type: '주차', name: r.name, member: r.member, phone: r.phone, id: r.id, carnum: r.carnum }); });
-  lockers.forEach(r => { const k = r.dong + '-' + r.ho; if (!house[k]) house[k] = { dong: r.dong, ho: r.ho, gc: 0, pc: 0, lc: 0, members: [] }; house[k].lc++; house[k].members.push({ type: '사물함', name: r.name, member: r.member, phone: r.phone, id: r.id }); });
-  let gTotal = 0, pTotal = 0, lTotal = 0;
-  Object.values(house).forEach(v => {
-    v.g = v.gc <= cfg.gymBase ? (v.gc > 0 ? cfg.gymFee : 0) : cfg.gymFee + (v.gc - cfg.gymBase) * cfg.gymAdd;
-    v.p = v.pc <= cfg.parkBase ? (v.pc > 0 ? cfg.parkFee : 0) : cfg.parkFee + (v.pc - cfg.parkBase) * cfg.parkAdd;
-    v.l = v.lc * cfg.lockerFee;
-    gTotal += v.g; pTotal += v.p; lTotal += v.l;
-  });
-  let html = `<div class="stat-grid">
+  /* [v51] 부과 계산은 computeBilling() 하나로 통일했다.
+     v50까지는 이 화면과 고지서 화면이 같은 계산식을 각자 복사해 갖고 있어서
+     한쪽만 고치면 두 화면 금액이 어긋났다. */
+  const R = computeBilling(ym, d, h, typeFilter);
+  const house = {}; R.houses.forEach(v => { house[v.key] = v; });
+  const gTotal = R.gTotal, pTotal = R.pTotal, lTotal = R.lTotal;
+  const conf = getBilling(ym);
+  const stateBox = conf
+    ? `<div class="alert alert-info" style="margin-bottom:14px">🔒 <b>${esc(ym)} 부과는 확정되어 있습니다.</b>
+        (확정 총액 <b>${conf.total.toLocaleString()}원</b> / ${conf.items.length}세대)<br>
+        아래는 <b>현재 등록 현황 기준의 실시간 계산값</b>입니다. 확정 후 인원이 바뀌었다면 확정액과 다를 수 있으며,
+        <b>고지서·수납·체납에는 확정액이 쓰입니다.</b></div>`
+    : `<div class="alert alert-warn" style="margin-bottom:14px">⚠️ <b>${esc(ym)} 부과는 아직 미확정입니다.</b>
+        이 금액은 지금 시점의 계산값이라 언제든 변할 수 있습니다.
+        <button class="btn btn-primary btn-sm no-print" style="margin-left:8px" onclick="document.getElementById('bg-month').value='${esc(ym)}';showPage('billing');previewBilling();">① 부과 확정하러 가기</button></div>`;
+  let html = stateBox + `<div class="stat-grid">
       <div class="stat-card green"><div class="s-label">헬스장 합계</div><div class="s-val">${gTotal.toLocaleString()}원</div></div>
       <div class="stat-card blue"><div class="s-label">주차 합계</div><div class="s-val">${pTotal.toLocaleString()}원</div></div>
       <div class="stat-card purple"><div class="s-label">사물함 합계</div><div class="s-val">${lTotal.toLocaleString()}원</div></div>
       <div class="stat-card amber"><div class="s-label">전체 합계</div><div class="s-val">${(gTotal + pTotal + lTotal).toLocaleString()}원</div></div>
     </div>
-    <div class="card"><div class="card-title">🏘️ 세대별 합산 요약 (등록 인원 전체)</div><div class="tbl-wrap"><table><thead><tr><th>삭제</th><th>동</th><th>호수</th><th>구분</th><th>성명</th><th>회원번호</th><th>전화번호</th><th>헬스장</th><th>주차</th><th>사물함</th><th>합계</th></tr></thead><tbody>` +
-    Object.values(house).sort((a, b) => a.dong === b.dong ? ((parseInt(a.ho)||0) - (parseInt(b.ho)||0)) : a.dong.localeCompare(b.dong)).map(v => {
+    <div class="card"><div class="card-title">🏘️ 세대별 합산 요약 (등록 인원 전체) — 적용 요금표: ${R.fee.effectYm ? esc(R.fee.effectYm) + ' 개정분' : '환경설정 현재값'}</div><div class="tbl-wrap"><table><thead><tr><th>삭제</th><th>동</th><th>호수</th><th>구분</th><th>성명</th><th>회원번호</th><th>전화번호</th><th>헬스장</th><th>주차</th><th>사물함</th><th>합계</th></tr></thead><tbody>` +
+    Object.values(house).sort(sortHouse).map(v => {
       const rowspan = v.members.length || 1;
       const houseTotal = (v.g + v.p + v.l).toLocaleString();
       if (!v.members.length) {
@@ -2177,31 +2807,620 @@ function deleteHousehold(dong, ho, ym) {
   runIntegratedQuery();
 }
 
+/* [v51] 고지서 출력 상태 표시 */
+function renderBillConfirmState() {
+  const box = document.getElementById('bill-confirm-state');
+  const ym = document.getElementById('b-month').value;
+  if (!box) return;
+  if (!ym) { box.innerHTML = ''; return; }
+  const b = getBilling(ym);
+  box.innerHTML = b
+    ? `<div class="alert alert-info" style="margin-bottom:16px">🔒 <b>${esc(ym)} 확정분</b>으로 고지서를 발행합니다.
+        확정 총액 <b>${b.total.toLocaleString()}원</b> / ${b.items.length}세대 (확정 ${new Date(b.confirmedAt).toLocaleString()})<br>
+        이 고지서 금액은 <b>요금표를 바꿔도 변하지 않습니다.</b></div>`
+    : `<div class="alert alert-warn" style="margin-bottom:16px">⚠️ <b>${esc(ym)} 부과가 확정되지 않았습니다.</b><br>
+        지금 출력하면 <b>"참고용"</b> 고지서가 나갑니다. 나중에 요금표를 바꾸면 재출력 시 금액이 달라져
+        입주민과 분쟁의 소지가 됩니다. <b>확정 후 배부하세요.</b>
+        <button class="btn btn-primary btn-sm no-print" style="margin-left:8px" onclick="document.getElementById('bg-month').value='${esc(ym)}';showPage('billing');previewBilling();">① 부과 확정하러 가기</button></div>`;
+}
+
+/* ============================================================================
+   [v51] 고지서 발행
+   v50까지: 매번 '현재' 요금표로 재계산 → 지난달 고지서를 다시 뽑으면 금액이 달랐다.
+   v51: 확정된 달은 확정 스냅샷을 그대로 출력한다. 미확정은 참고용임을 명시한다.
+   ============================================================================ */
 function generateBills() {
   const ym = document.getElementById('b-month').value;
   const d = document.getElementById('b-dong').value;
   const h = document.getElementById('b-ho').value.trim();
   if (!ym) { alert('연월을 선택하세요.'); return; }
-  const house = {};
-  gymData.filter(r => isActive(r, ym, true) && (!d || r.dong === d) && (!h || r.ho === h)).forEach(r => { const k = r.dong + '-' + r.ho; if (!house[k]) house[k] = { dong: r.dong, ho: r.ho, name: r.name, gc: 0, pc: 0, lc: 0 }; house[k].gc++; });
-  parkData.filter(r => isActive(r, ym) && (!d || r.dong === d) && (!h || r.ho === h)).forEach(r => { const k = r.dong + '-' + r.ho; if (!house[k]) house[k] = { dong: r.dong, ho: r.ho, name: r.name, gc: 0, pc: 0, lc: 0 }; house[k].pc++; });
-  lockerData.filter(r => isActive(r, ym) && (!d || r.dong === d) && (!h || r.ho === h)).forEach(r => { const k = r.dong + '-' + r.ho; if (!house[k]) house[k] = { dong: r.dong, ho: r.ho, name: r.name, gc: 0, pc: 0, lc: 0 }; house[k].lc++; });
-  let html = '';
-  Object.values(house).sort((a, b) => a.dong === b.dong ? ((parseInt(a.ho)||0) - (parseInt(b.ho)||0)) : a.dong.localeCompare(b.dong)).forEach(v => {
-    const gFee = v.gc <= cfg.gymBase ? (v.gc > 0 ? cfg.gymFee : 0) : cfg.gymFee + (v.gc - cfg.gymBase) * cfg.gymAdd;
-    const pFee = v.pc <= cfg.parkBase ? (v.pc > 0 ? cfg.parkFee : 0) : cfg.parkFee + (v.pc - cfg.parkBase) * cfg.parkAdd;
-    const lFee = v.lc * cfg.lockerFee;
-    html += `<div class="card" style="max-width:600px;margin:0 auto 30px;padding:30px;border:2px solid #ccc; background:#fff; color:#000"><div style="text-align:center;border-bottom:2px solid #1a7a5e;padding-bottom:10px;margin-bottom:20px"><h2 style="color:#1a7a5e">아파트 시설 이용료 부과 고지서</h2><p>${ym} 부과분</p></div>
+  renderBillConfirmState();
+
+  const snap = getBilling(ym);
+  let items, fee, confirmed;
+  if (snap) {
+    confirmed = true; fee = snap.feeSnapshot;
+    items = snap.items.filter(v => (!d || v.dong === d) && (!h || v.ho === h));
+  } else {
+    confirmed = false;
+    const R = computeBilling(ym, d, h);
+    items = R.houses; fee = R.fee;
+  }
+  if (!items.length) { document.getElementById('bill-result').innerHTML = '<p class="tbl-empty">내역이 없습니다.</p>'; return; }
+
+  const pays = getPayments().filter(p => p.ym === ym);
+  const html = items.slice().sort(sortHouse).map(v => {
+    const paid = pays.filter(p => p.dong === v.dong && p.ho === v.ho).reduce((a, p) => a + Number(p.amount || 0), 0);
+    const unpaid = v.total - paid;
+    const stamp = confirmed
+      ? `<div style="position:absolute;top:16px;right:18px;border:2px solid #1a7a5e;color:#1a7a5e;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:800">확정</div>`
+      : `<div style="position:absolute;top:16px;right:18px;border:2px solid #b45309;color:#b45309;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:800">참고용·미확정</div>`;
+    return `<div class="card" style="position:relative;max-width:600px;margin:0 auto 30px;padding:30px;border:2px solid #ccc; background:#fff; color:#000">
+      ${stamp}
+      <div style="text-align:center;border-bottom:2px solid #1a7a5e;padding-bottom:10px;margin-bottom:20px">
+        <h2 style="color:#1a7a5e">아파트 시설 이용료 부과 고지서</h2><p>${esc(ym)} 부과분</p></div>
       <p style="margin-bottom:10px">🏠 세대: <b>${esc(v.dong)}동 ${esc(v.ho)}호</b> (${esc(v.name)} 귀하)</p>
       <div class="tbl-wrap"><table><thead><tr><th style="color:#333">항목</th><th style="color:#333">내용</th><th style="text-align:right;color:#333">금액</th></tr></thead><tbody>
-        <tr><td>헬스장 이용료</td><td>${v.gc}명 이용</td><td style="text-align:right">${gFee.toLocaleString()}원</td></tr>
-        <tr><td>주차 이용료</td><td>${v.pc}대 등록</td><td style="text-align:right">${pFee.toLocaleString()}원</td></tr>
-        <tr><td>사물함 이용료</td><td>${v.lc}개 사용</td><td style="text-align:right">${lFee.toLocaleString()}원</td></tr>
-        <tr style="background:#f8f9fa;font-weight:700"><td>합계</td><td></td><td style="text-align:right">${(gFee + pFee + lFee).toLocaleString()}원</td></tr>
-      </tbody></table></div><div style="margin-top:20px;font-size:12px;color:#666;text-align:center">계좌: ${esc(cfg.bank)} | 문의: ${esc(cfg.phone)}</div>
-      <div style="margin-top:6px;font-size:10px;color:#999;text-align:center">※ 본 고지서는 출력 시점(${todayStr()})의 요금표 기준으로 산출되었습니다.</div></div>`;
-  });
-  document.getElementById('bill-result').innerHTML = html || '<p class="tbl-empty">내역이 없습니다.</p>';
+        <tr><td>헬스장 이용료</td><td>${v.gc}명 이용</td><td style="text-align:right">${v.g.toLocaleString()}원</td></tr>
+        <tr><td>주차 이용료</td><td>${v.pc}대 등록</td><td style="text-align:right">${v.p.toLocaleString()}원</td></tr>
+        <tr><td>사물함 이용료</td><td>${v.lc}개 사용</td><td style="text-align:right">${v.l.toLocaleString()}원</td></tr>
+        <tr style="background:#f8f9fa;font-weight:700"><td>부과액 합계</td><td></td><td style="text-align:right">${v.total.toLocaleString()}원</td></tr>
+        ${paid > 0 ? `<tr><td>기납부액</td><td>${todayStr()} 기준</td><td style="text-align:right">-${paid.toLocaleString()}원</td></tr>
+        <tr style="background:#fff4f4;font-weight:800"><td>납부하실 금액</td><td></td><td style="text-align:right;color:${unpaid > 0 ? '#dc2626' : '#1a7a5e'}">${unpaid.toLocaleString()}원${unpaid <= 0 ? ' (완납)' : ''}</td></tr>` : ''}
+      </tbody></table></div>
+      <div style="margin-top:20px;font-size:12px;color:#666;text-align:center">계좌: ${esc(cfg.bank)} | 문의: ${esc(cfg.phone)}</div>
+      <div style="margin-top:6px;font-size:10px;color:#999;text-align:center">
+        ${confirmed
+          ? `※ ${esc(ym)} 확정 부과분입니다. (확정일 ${new Date(snap.confirmedAt).toLocaleDateString()}${fee.effectYm ? ' / ' + esc(fee.effectYm) + ' 개정 요금표 적용' : ''})`
+          : `※ 미확정 참고용입니다. 출력 시점(${todayStr()})의 요금표로 산출되었으며 확정 시 금액이 달라질 수 있습니다.`}
+      </div></div>`;
+  }).join('');
+  document.getElementById('bill-result').innerHTML = html;
+}
+
+
+/* ============================================================================
+   [v51] ① 부과 확정 화면
+   ============================================================================ */
+function initBillingPage() {
+  const el = document.getElementById('bg-month');
+  if (!el.value) el.value = ymStr();
+  renderBillingPage();
+}
+
+function money(n) { return (Number(n) || 0).toLocaleString(); }
+function moneyCell(n, cls) {
+  const v = Number(n) || 0;
+  return `<td class="money ${v === 0 ? 'zero' : (cls || '')}">${v.toLocaleString()}</td>`;
+}
+
+function previewBilling() {
+  const ym = document.getElementById('bg-month').value;
+  if (!ym) { alert('부과 연월을 선택하세요.'); return; }
+  const box = document.getElementById('billing-preview');
+  const done = getBilling(ym);
+
+  if (done) {
+    const st = getReceiptStatus(ym);
+    const paid = st.reduce((a, x) => a + x.paid, 0);
+    box.innerHTML = `<div class="alert alert-info" style="margin-bottom:14px">
+        <b>${ym} 부과는 이미 확정되어 있습니다.</b> (확정 ${new Date(done.confirmedAt).toLocaleString()})<br>
+        아래는 <b>확정 당시 보관된 금액</b>이며, 지금 요금표를 바꿔도 변하지 않습니다.
+      </div>` + billingTable(done.items, done.feeSnapshot, true) +
+      `<div style="margin-top:10px;font-size:12px;color:var(--text2)">수납 ${money(paid)}원 / 미납 ${money(done.total - paid)}원</div>`;
+    return;
+  }
+
+  const r = computeBilling(ym);
+  if (!r.houses.length) { box.innerHTML = '<p class="tbl-empty">해당 월에 부과할 세대가 없습니다.</p>'; return; }
+
+  /* 확정 전이라 금액이 유동적이라는 점을 분명히 알린다 */
+  let feeMsg = r.fee.effectYm
+    ? `적용 요금표: <b>${r.fee.effectYm} 개정분</b>`
+    : `적용 요금표: <b>환경설정 현재값</b> (요금표 이력이 없습니다 — 환경설정에서 등록을 권장합니다)`;
+  box.innerHTML = `<div class="alert alert-warn" style="margin-bottom:14px">
+      <b>⚠️ 미확정 상태입니다.</b> 아래 금액은 <b>지금 이 순간</b>의 등록 현황과 요금표로 계산한 값입니다.<br>
+      확정하기 전까지는 인원이 바뀌거나 요금을 수정하면 금액이 함께 변합니다. ${feeMsg}
+    </div>` + billingTable(r.houses, r.fee, false);
+}
+
+function billingTable(items, fee, confirmed) {
+  const g = items.reduce((a, v) => a + v.g, 0), p = items.reduce((a, v) => a + v.p, 0);
+  const l = items.reduce((a, v) => a + v.l, 0), t = items.reduce((a, v) => a + v.total, 0);
+  return `<div class="stat-grid" style="margin-bottom:16px">
+      <div class="stat-card green"><div class="s-label">헬스장</div><div class="s-val">${money(g)}원</div></div>
+      <div class="stat-card blue"><div class="s-label">주차</div><div class="s-val">${money(p)}원</div></div>
+      <div class="stat-card purple"><div class="s-label">사물함</div><div class="s-val">${money(l)}원</div></div>
+      <div class="stat-card amber"><div class="s-label">부과 총액 (${items.length}세대)</div><div class="s-val">${money(t)}원</div></div>
+    </div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr>
+      <th>동</th><th>호</th><th>성명</th><th>헬스</th><th>주차</th><th>사물함</th>
+      <th class="money">헬스장료</th><th class="money">주차료</th><th class="money">사물함료</th><th class="money">합계</th>
+    </tr></thead><tbody>` +
+    items.map(v => `<tr><td>${esc(v.dong)}동</td><td>${esc(v.ho)}호</td><td>${esc(v.name) || '-'}</td>
+      <td>${v.gc}명</td><td>${v.pc}대</td><td>${v.lc}개</td>
+      ${moneyCell(v.g)}${moneyCell(v.p)}${moneyCell(v.l)}<td class="money"><b>${money(v.total)}</b></td></tr>`).join('') +
+    `</tbody></table></div>`;
+}
+
+function renderBillingPage() {
+  const bills = getBillings();
+  const pays = getPayments();
+  const body = document.getElementById('billing-hist-body');
+  if (!bills.length) {
+    body.innerHTML = `<tr><td colspan="11" class="tbl-empty">확정된 부과가 없습니다. 위에서 연월을 고르고 [미리보기] → [이 달 부과 확정]을 눌러주세요.</td></tr>`;
+  } else {
+    body.innerHTML = bills.map(b => {
+      const paid = pays.filter(p => p.ym === b.ym).reduce((a, p) => a + Number(p.amount || 0), 0);
+      const unpaid = b.total - paid;
+      const rate = b.total > 0 ? Math.round(paid / b.total * 100) : 0;
+      return `<tr>
+        <td><b>${esc(b.ym)}</b> <span class="st-badge st-확정">확정</span></td>
+        <td style="font-size:11px">${new Date(b.confirmedAt).toLocaleString()}</td>
+        <td>${b.items.length}세대</td>
+        ${moneyCell(b.gTotal)}${moneyCell(b.pTotal)}${moneyCell(b.lTotal)}
+        <td class="money"><b>${money(b.total)}</b></td>
+        <td class="money">${money(paid)} <small style="color:var(--text2)">(${rate}%)</small></td>
+        ${moneyCell(unpaid, unpaid > 0 ? 'neg' : '')}
+        <td style="font-size:11px">${b.feeSnapshot && b.feeSnapshot.effectYm ? esc(b.feeSnapshot.effectYm) + ' 개정' : '설정 현재값'}</td>
+        <td class="no-print">
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('bg-month').value='${esc(b.ym)}';previewBilling();">보기</button>
+          <button class="btn btn-red btn-sm" onclick="cancelBilling('${esc(b.ym)}')">확정취소</button>
+        </td></tr>`;
+    }).join('');
+  }
+  updateFlowBadges();
+}
+
+/* ============================================================================
+   [v51] ③ 수납 확인 화면
+   ============================================================================ */
+function initPaymentPage() {
+  const m = document.getElementById('pay-month');
+  if (!m.value) {
+    const bills = getBillings();
+    m.value = bills.length ? bills[0].ym : ymStr();
+  }
+  const sel = document.getElementById('pay-dong');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">전체</option>' +
+    Array.from({ length: cfg.buildings || 8 }, (_, i) => `<option>${101 + i}</option>`).join('');
+  sel.value = cur;
+  renderPaymentPage();
+}
+
+function filteredReceipts() {
+  const ym = document.getElementById('pay-month').value;
+  const st = getReceiptStatus(ym);
+  if (!st) return null;
+  const d = document.getElementById('pay-dong').value;
+  const stf = document.getElementById('pay-status').value;
+  const q = document.getElementById('pay-search').value.trim().toLowerCase();
+  return st.filter(x =>
+    (!d || x.dong === d) && (!stf || x.status === stf) &&
+    (!q || (x.dong + x.ho + (x.name || '')).toLowerCase().includes(q)));
+}
+
+function renderPaymentPage() {
+  const ym = document.getElementById('pay-month').value;
+  const sum = document.getElementById('pay-summary');
+  const res = document.getElementById('pay-result');
+  if (!ym) { sum.innerHTML = ''; res.innerHTML = '<p class="tbl-empty">부과 연월을 선택하세요.</p>'; return; }
+
+  const all = getReceiptStatus(ym);
+  if (!all) {
+    sum.innerHTML = '';
+    res.innerHTML = `<div class="alert alert-warn">
+      <b>${esc(ym)} 부과가 아직 확정되지 않았습니다.</b><br>
+      수납은 <b>확정된 부과액</b>이 있어야 대사할 수 있습니다. 확정 전에는 무엇을 얼마 받아야 하는지가 정해지지 않기 때문입니다.<br>
+      <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="document.getElementById('bg-month').value='${esc(ym)}';showPage('billing');previewBilling();">① 부과 확정하러 가기</button>
+    </div>`;
+    updateFlowBadges(); return;
+  }
+
+  const billed = all.reduce((a, x) => a + x.total, 0);
+  const paid = all.reduce((a, x) => a + x.paid, 0);
+  const unpaid = billed - paid;
+  const rate = billed > 0 ? Math.round(paid / billed * 100) : 0;
+  const cnt = { 완납: 0, 부분납: 0, 미납: 0, 과납: 0 };
+  all.forEach(x => { if (cnt[x.status] !== undefined) cnt[x.status]++; });
+
+  sum.innerHTML = `<div class="stat-grid">
+      <div class="stat-card blue"><div class="s-label">부과액 (${all.length}세대)</div><div class="s-val">${money(billed)}원</div></div>
+      <div class="stat-card green"><div class="s-label">수납액 · 수납률 ${rate}%</div><div class="s-val">${money(paid)}원</div></div>
+      <div class="stat-card red"><div class="s-label">미납액</div><div class="s-val">${money(unpaid)}원</div></div>
+      <div class="stat-card amber"><div class="s-label">완납 ${cnt.완납} / 부분 ${cnt.부분납} / 미납 ${cnt.미납}</div><div class="s-val">${cnt.미납 + cnt.부분납}세대 미완납</div></div>
+    </div>`;
+
+  const rows = filteredReceipts();
+  if (!rows.length) { res.innerHTML = '<p class="tbl-empty">조건에 맞는 세대가 없습니다.</p>'; updateFlowBadges(); return; }
+
+  res.innerHTML = `<div class="tbl-wrap"><table class="tbl"><thead><tr>
+      <th>동</th><th>호</th><th>성명</th><th class="money">부과액</th><th class="money">수납액</th><th class="money">미납액</th>
+      <th>상태</th><th>최종입금일</th><th class="no-print">수납 등록</th>
+    </tr></thead><tbody>` +
+    rows.map(x => `<tr class="row-${x.status}">
+      <td>${esc(x.dong)}동</td><td>${esc(x.ho)}호</td><td>${esc(x.name) || '-'}</td>
+      <td class="money">${money(x.total)}</td>
+      <td class="money">${money(x.paid)}${x.pays.length > 1 ? ` <small style="color:var(--text2)">(${x.pays.length}회)</small>` : ''}</td>
+      ${moneyCell(x.unpaid, x.unpaid > 0 ? 'neg' : '')}
+      <td><span class="st-badge st-${x.status}">${x.status}</span></td>
+      <td style="font-size:11px">${esc(x.lastPayDate) || '-'}</td>
+      <td class="no-print">
+        <button class="btn btn-outline btn-sm" onclick="openPayModal('${esc(x.dong)}','${esc(x.ho)}')">입금 등록</button>
+        ${x.pays.length ? `<button class="btn btn-outline btn-sm" onclick="togglePayDetail('${esc(x.dong)}-${esc(x.ho)}')">내역 ${x.pays.length}</button>` : ''}
+      </td></tr>
+      ${x.pays.length ? `<tr id="paydtl-${esc(x.dong)}-${esc(x.ho)}" style="display:none"><td colspan="9" style="background:var(--bg);padding:8px 14px">
+        <table class="tbl" style="font-size:11px;background:transparent"><thead><tr><th>입금일</th><th class="money">금액</th><th>수단</th><th>메모</th><th class="no-print">삭제</th></tr></thead><tbody>` +
+        x.pays.sort((a, b) => a.payDate.localeCompare(b.payDate)).map(p => `<tr>
+          <td>${esc(p.payDate)}</td><td class="money">${money(p.amount)}</td><td>${esc(p.method)}</td><td>${esc(p.memo) || '-'}</td>
+          <td class="no-print"><button class="btn btn-red btn-sm" onclick="deletePayment('${p.id}')">삭제</button></td></tr>`).join('') +
+        `</tbody></table></td></tr>` : ''}`).join('') +
+    `</tbody></table></div>`;
+  updateFlowBadges();
+}
+
+function togglePayDetail(k) {
+  const el = document.getElementById('paydtl-' + k);
+  if (el) el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+}
+
+/* 입금 등록 모달 */
+function openPayModal(dong, ho) {
+  const ym = document.getElementById('pay-month').value;
+  const st = getReceiptStatus(ym).find(x => x.dong === dong && x.ho === ho);
+  if (!st) return;
+  document.getElementById('pm-ym').textContent = ym;
+  document.getElementById('pm-house').textContent = `${dong}동 ${ho}호 ${st.name || ''}`;
+  document.getElementById('pm-billed').textContent = money(st.total) + '원';
+  document.getElementById('pm-paid').textContent = money(st.paid) + '원';
+  document.getElementById('pm-unpaid').textContent = money(st.unpaid) + '원';
+  document.getElementById('pm-dong').value = dong;
+  document.getElementById('pm-ho').value = ho;
+  document.getElementById('pm-amount').value = st.unpaid > 0 ? st.unpaid : '';
+  document.getElementById('pm-date').value = todayStr();
+  document.getElementById('pm-method').value = '계좌이체';
+  document.getElementById('pm-memo').value = '';
+  document.getElementById('modal-payment').classList.add('open');
+}
+function closePayModal() { document.getElementById('modal-payment').classList.remove('open'); }
+
+function savePayment() {
+  const ym = document.getElementById('pay-month').value;
+  const dong = document.getElementById('pm-dong').value;
+  const ho = document.getElementById('pm-ho').value;
+  const amount = Number(document.getElementById('pm-amount').value);
+  const date = document.getElementById('pm-date').value;
+  if (!amount || amount <= 0) { alert('입금액을 정확히 입력하세요.'); return; }
+  if (!date) { alert('입금일을 입력하세요.'); return; }
+  addPayment(ym, dong, ho, amount, date,
+             document.getElementById('pm-method').value,
+             document.getElementById('pm-memo').value.trim());
+  closePayModal();
+  renderPaymentPage();
+}
+
+/* 표시된 미납 세대 일괄 완납 처리 — 은행 입금내역이 전부 맞을 때 쓰는 단축키 */
+function bulkFullPay() {
+  const ym = document.getElementById('pay-month').value;
+  const rows = (filteredReceipts() || []).filter(x => x.unpaid > 0);
+  if (!rows.length) { alert('미납 세대가 없습니다.'); return; }
+  const sum = rows.reduce((a, x) => a + x.unpaid, 0);
+  const date = prompt(`현재 화면에 표시된 미납 ${rows.length}세대를 모두 완납 처리합니다.\n` +
+                      `합계 ${money(sum)}원\n\n입금일을 입력하세요 (YYYY-MM-DD)`, todayStr());
+  if (!date) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { alert('날짜 형식이 올바르지 않습니다.'); return; }
+  if (!confirm(`정말 ${rows.length}세대를 완납 처리하시겠습니까?\n실제 입금을 확인한 세대만 처리하세요.`)) return;
+  rows.forEach(x => addPayment(ym, x.dong, x.ho, x.unpaid, date, '계좌이체', '일괄 완납 처리'));
+  auditLog('수납', `${ym} 일괄 완납 처리`, `${rows.length}세대 / ${money(sum)}원`);
+  alert(`✅ ${rows.length}세대 완납 처리했습니다.`);
+  renderPaymentPage();
+}
+
+/* ============================================================================
+   [v51] ④ 체납 독촉 화면
+   ============================================================================ */
+function initArrearsPage() {
+  const el = document.getElementById('arr2-asof');
+  if (!el.value) { const b = getBillings(); el.value = b.length ? b[0].ym : ymStr(); }
+  renderArrearsPage();
+}
+
+function filteredArrears() {
+  const asOf = document.getElementById('arr2-asof').value;
+  const minM = Number(document.getElementById('arr2-months').value) || 1;
+  const q = document.getElementById('arr2-search').value.trim().toLowerCase();
+  return getArrearsSummary(asOf).filter(m =>
+    m.months >= minM && (!q || (m.dong + m.ho + (m.name || '')).toLowerCase().includes(q)));
+}
+
+function renderArrearsPage() {
+  const sum = document.getElementById('arr2-summary');
+  const res = document.getElementById('arr2-result');
+  if (!getBillings().length) {
+    sum.innerHTML = '';
+    res.innerHTML = `<div class="alert alert-warn"><b>확정된 부과가 없습니다.</b><br>
+      체납은 확정 부과액에서 수납액을 뺀 값입니다. 먼저 [① 부과 확정]을 진행하세요.</div>`;
+    updateFlowBadges(); return;
+  }
+  const rows = filteredArrears();
+  const all = getArrearsSummary(document.getElementById('arr2-asof').value);
+  const total = all.reduce((a, m) => a + m.unpaid, 0);
+  const long = all.filter(m => m.months >= 3).length;
+
+  sum.innerHTML = `<div class="stat-grid">
+      <div class="stat-card red"><div class="s-label">체납 세대</div><div class="s-val">${all.length}세대</div></div>
+      <div class="stat-card amber"><div class="s-label">체납 총액</div><div class="s-val">${money(total)}원</div></div>
+      <div class="stat-card purple"><div class="s-label">3개월 이상 장기</div><div class="s-val">${long}세대</div></div>
+      <div class="stat-card blue"><div class="s-label">세대당 평균</div><div class="s-val">${money(all.length ? Math.round(total / all.length) : 0)}원</div></div>
+    </div>`;
+
+  if (!rows.length) { res.innerHTML = '<p class="tbl-empty">조건에 맞는 체납 세대가 없습니다. 👍</p>'; updateFlowBadges(); return; }
+
+  res.innerHTML = `<div class="tbl-wrap"><table class="tbl"><thead><tr>
+      <th>동</th><th>호</th><th>성명</th><th>연락처</th><th>체납개월</th>
+      <th class="money">부과누계</th><th class="money">수납누계</th><th class="money">체납액</th><th>미납 월</th><th class="no-print">독촉장</th>
+    </tr></thead><tbody>` +
+    rows.map(m => {
+      const c = findContact(m.dong, m.ho);
+      const badge = m.months >= 3 ? 'st-미납' : (m.months >= 2 ? 'st-부분납' : 'st-부과없음');
+      return `<tr class="row-미납">
+        <td>${esc(m.dong)}동</td><td>${esc(m.ho)}호</td><td>${esc(m.name || c.name) || '-'}</td>
+        <td style="font-size:11px">${esc(c.phone) || '-'}</td>
+        <td><span class="st-badge ${badge}">${m.months}개월</span></td>
+        <td class="money">${money(m.billed)}</td><td class="money">${money(m.paid)}</td>
+        <td class="money neg">${money(m.unpaid)}</td>
+        <td style="font-size:11px">${m.detail.map(d => esc(d.ym)).join(', ')}</td>
+        <td class="no-print"><button class="btn btn-red btn-sm" onclick="printNotice('${esc(m.dong)}','${esc(m.ho)}')">출력</button></td>
+      </tr>`;
+    }).join('') + `</tbody></table></div>`;
+  updateFlowBadges();
+}
+
+/* ---- 독촉장 ---- */
+function noticeHtml(m) {
+  const c = findContact(m.dong, m.ho);
+  const name = m.name || c.name || '';
+  const rows = m.detail.map(d =>
+    `<tr><td style="text-align:center">${esc(d.ym)}</td><td style="text-align:right">${money(d.billed)}원</td>` +
+    `<td style="text-align:right">${money(d.paid)}원</td><td style="text-align:right;font-weight:700">${money(d.unpaid)}원</td></tr>`).join('');
+  const today = new Date();
+  const dueD = new Date(today.getTime() + 14 * 86400000);
+  return `<div class="notice-doc">
+    <div class="doc-no">문서번호: 관리-${todayStr().replace(/-/g, '')}-${esc(m.dong)}${esc(m.ho)}</div>
+    <h2>독 촉 장</h2>
+    <p style="text-align:center;font-size:12px;color:#555;margin-bottom:22px">시설 이용료 체납분 납부 안내</p>
+    <table><tr><th style="width:90px">수신</th><td>${esc(m.dong)}동 ${esc(m.ho)}호 ${esc(name)} 귀하</td></tr>
+      <tr><th>발신</th><td>아파트 관리사무소 (문의 ${esc(cfg.phone)})</td></tr>
+      <tr><th>작성일</th><td>${todayStr()}</td></tr></table>
+    <p style="margin:18px 0">평소 관리업무에 협조해 주셔서 감사합니다.<br>
+      아래와 같이 시설 이용료가 <b>${m.months}개월분 ${money(m.unpaid)}원</b> 미납되어 안내드립니다.
+      기한 내 납부하여 주시기 바랍니다.</p>
+    <table>
+      <thead><tr><th style="text-align:center">부과월</th><th style="text-align:right">부과액</th>
+        <th style="text-align:right">수납액</th><th style="text-align:right">미납액</th></tr></thead>
+      <tbody>${rows}
+        <tr style="background:#f1f3f5;font-weight:800"><td style="text-align:center">합계</td>
+          <td style="text-align:right">${money(m.billed)}원</td><td style="text-align:right">${money(m.paid)}원</td>
+          <td style="text-align:right">${money(m.unpaid)}원</td></tr></tbody>
+    </table>
+    <table><tr><th style="width:90px">납부기한</th><td><b>${todayStr(dueD)}</b></td></tr>
+      <tr><th>입금계좌</th><td><b>${esc(cfg.bank)}</b></td></tr>
+      <tr><th>문의</th><td>${esc(cfg.phone)}</td></tr></table>
+    <p style="font-size:11px;color:#666;margin-top:14px">
+      ※ 이미 납부하셨다면 본 안내와 엇갈렸을 수 있으니 관리사무소로 연락 주시기 바랍니다.<br>
+      ※ 본 독촉장은 ${todayStr()} 기준 확정 부과 및 수납 기록에 따라 작성되었습니다.</p>
+    <div class="sign">아파트 관리사무소장</div>
+  </div>`;
+}
+
+function openPrintWindow(html, title) {
+  const w = window.open('', '_blank');
+  if (!w) { alert('팝업이 차단되었습니다. 브라우저 주소창의 팝업 차단을 해제해주세요.'); return; }
+  w.document.write(`<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>${title}</title>
+    <style>body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;margin:0;padding:20px;background:#f5f5f5}
+    ${document.querySelector('style').textContent.match(/\.notice-doc[\s\S]*?@media print \{ \.notice-doc \{ page-break-after: always; border: none; \} \}/) || ''}
+    </style></head><body>${html}
+    <script>window.onload=function(){window.print();}<\/script></body></html>`);
+  w.document.close();
+}
+
+function printNotice(dong, ho) {
+  const m = getArrearsSummary(document.getElementById('arr2-asof').value).find(x => x.dong === dong && x.ho === ho);
+  if (!m) { alert('체납 내역을 찾을 수 없습니다.'); return; }
+  openPrintWindow(noticeHtml(m), `독촉장_${dong}동${ho}호`);
+  auditLog('체납', `${dong}동 ${ho}호 독촉장 출력`, `${money(m.unpaid)}원 / ${m.months}개월`);
+}
+
+function printAllNotices() {
+  const rows = filteredArrears();
+  if (!rows.length) { alert('출력할 체납 세대가 없습니다.'); return; }
+  if (!confirm(`${rows.length}세대의 독촉장을 출력합니다.\n(세대당 1장씩, 총 ${rows.length}장)`)) return;
+  openPrintWindow(rows.map(noticeHtml).join(''), `독촉장_일괄_${rows.length}건`);
+  auditLog('체납', `독촉장 일괄 출력`, `${rows.length}세대`);
+}
+
+/* ============================================================================
+   [v51] 사이드바 미납 배지 — 할 일이 남았는지 한눈에
+   ============================================================================ */
+function updateFlowBadges() {
+  try {
+    const bills = getBillings();
+    const payB = document.getElementById('nav-pay-badge');
+    const arrB = document.getElementById('nav-arr-badge');
+    if (payB) {
+      let n = 0;
+      bills.forEach(b => { const st = getReceiptStatus(b.ym); if (st) n += st.filter(x => x.unpaid > 0).length; });
+      payB.textContent = n; payB.style.display = n ? 'inline-block' : 'none';
+    }
+    if (arrB) {
+      const n = getArrearsSummary().length;
+      arrB.textContent = n; arrB.style.display = n ? 'inline-block' : 'none';
+    }
+  } catch (e) { console.warn('badge', e); }
+}
+
+/* ============================================================================
+   [v51] 엑셀 출력
+   ============================================================================ */
+function xlsxGuard() {
+  if (typeof XLSX === 'undefined') { alert('인터넷 연결이 없어 엑셀 기능을 쓸 수 없습니다.\n(브라우저 인쇄 → PDF 저장을 이용하세요)'); return false; }
+  return true;
+}
+
+function exportBillingToExcel() {
+  if (!xlsxGuard()) return;
+  const bills = getBillings();
+  if (!bills.length) { alert('확정된 부과가 없습니다.'); return; }
+  const pays = getPayments();
+  const rows = [];
+  bills.forEach(b => b.items.forEach(it => {
+    const paid = pays.filter(p => p.ym === b.ym && p.dong === it.dong && p.ho === it.ho)
+                     .reduce((a, p) => a + Number(p.amount || 0), 0);
+    rows.push({ '부과월': b.ym, '확정일시': new Date(b.confirmedAt).toLocaleString(),
+      '동': it.dong, '호': it.ho, '성명': it.name, '헬스인원': it.gc, '주차대수': it.pc, '사물함': it.lc,
+      '헬스장료': it.g, '주차료': it.p, '사물함료': it.l, '부과액': it.total,
+      '수납액': paid, '미납액': it.total - paid,
+      '적용요금표': b.feeSnapshot && b.feeSnapshot.effectYm ? b.feeSnapshot.effectYm : '설정값' });
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '부과확정내역');
+  XLSX.writeFile(wb, `부과확정내역_${todayStr()}.xlsx`);
+}
+
+function exportPaymentToExcel() {
+  if (!xlsxGuard()) return;
+  const ym = document.getElementById('pay-month').value;
+  const rows = filteredReceipts();
+  if (!rows || !rows.length) { alert('출력할 내역이 없습니다.'); return; }
+  const out = rows.map(x => ({ '부과월': ym, '동': x.dong, '호': x.ho, '성명': x.name,
+    '부과액': x.total, '수납액': x.paid, '미납액': x.unpaid, '상태': x.status,
+    '최종입금일': x.lastPayDate, '입금횟수': x.pays.length,
+    '입금내역': x.pays.map(p => `${p.payDate} ${money(p.amount)}원(${p.method})`).join(' / ') }));
+  const ws = XLSX.utils.json_to_sheet(out); const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, `수납현황_${ym}`);
+  XLSX.writeFile(wb, `수납현황_${ym}.xlsx`);
+}
+
+function exportArrears2ToExcel() {
+  if (!xlsxGuard()) return;
+  const rows = filteredArrears();
+  if (!rows.length) { alert('출력할 체납 내역이 없습니다.'); return; }
+  const out = rows.map(m => { const c = findContact(m.dong, m.ho);
+    return { '동': m.dong, '호': m.ho, '성명': m.name || c.name, '연락처': c.phone,
+      '체납개월': m.months, '부과누계': m.billed, '수납누계': m.paid, '체납액': m.unpaid,
+      '미납월': m.detail.map(d => d.ym).join(', '), '최종입금일': m.lastPayDate,
+      '미납상세': m.detail.map(d => `${d.ym}:${money(d.unpaid)}원`).join(' / ') }; });
+  const ws = XLSX.utils.json_to_sheet(out); const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '체납현황');
+  XLSX.writeFile(wb, `체납현황_${todayStr()}.xlsx`);
+}
+
+
+/* ============================================================================
+   [v51] 요금표 이력 UI
+   ============================================================================ */
+function saveFeeRevision() {
+  const ym = document.getElementById('fee-effect').value;
+  if (!ym) { alert('적용 시작 연월을 선택하세요.'); return; }
+  const memo = document.getElementById('fee-memo').value.trim();
+
+  /* 화면의 입력칸 값을 그대로 요금표로 굳힌다 (저장 안 눌러도 되게) */
+  const f = {
+    gymFee: Number(document.getElementById('s-gym-fee').value) || 0,
+    gymAdd: Number(document.getElementById('s-gym-add').value) || 0,
+    gymBase: Number(document.getElementById('s-gym-base').value) || 0,
+    gymCutDay: Number(document.getElementById('s-gym-cut').value) || 0,
+    parkFee: Number(document.getElementById('s-park-fee').value) || 0,
+    parkAdd: Number(document.getElementById('s-park-add').value) || 0,
+    parkBase: Number(document.getElementById('s-park-base').value) || 0,
+    parkCutDay: Number(document.getElementById('s-park-cut').value) || 0,
+    lockerFee: Number(document.getElementById('s-locker-fee').value) || 0,
+    lockerCutDay: Number(document.getElementById('s-locker-cut').value) || 0
+  };
+
+  const affected = getBillings().filter(b => b.ym >= ym);
+  let msg = `${ym}부터 아래 요금표를 적용합니다.\n\n` +
+    `· 헬스장 ${f.gymFee.toLocaleString()}원 (기본 ${f.gymBase}명, 추가 ${f.gymAdd.toLocaleString()}원, 기준일 ${f.gymCutDay})\n` +
+    `· 주차 ${f.parkFee.toLocaleString()}원 (기본 ${f.parkBase}대, 추가 ${f.parkAdd.toLocaleString()}원, 기준일 ${f.parkCutDay})\n` +
+    `· 사물함 ${f.lockerFee.toLocaleString()}원/개 (기준일 ${f.lockerCutDay})\n`;
+  if (affected.length) {
+    msg += `\n※ ${ym} 이후 확정된 부과 ${affected.length}건(${affected.map(b => b.ym).join(', ')})은\n` +
+           `   확정 당시 금액이 그대로 유지됩니다. 새 요금을 반영하려면 확정을 취소하고 다시 확정하세요.\n`;
+  }
+  msg += `\n등록하시겠습니까?`;
+  if (!confirm(msg)) return;
+  if (!addFeeRevision(ym, f, memo)) return;
+  document.getElementById('fee-memo').value = '';
+  renderFeeHistory();
+  alert(`✅ ${ym} 적용 요금표가 등록되었습니다.`);
+}
+
+function renderFeeHistory() {
+  const box = document.getElementById('fee-hist');
+  if (!box) return;
+  const hist = getFeeHistory();
+  const cur = ymStr();
+
+  if (!hist.length) {
+    box.innerHTML = `<div class="alert alert-warn">
+      <b>등록된 요금표 이력이 없습니다.</b><br>
+      지금은 [환경설정]의 현재 값으로 모든 달을 계산합니다. 즉 <b>요금을 바꾸면 과거 미확정분이 전부 같이 바뀝니다.</b><br>
+      현재 요금을 기준으로 삼으시려면, 위 [적용 시작 연월]에 <b>운영을 시작한 달</b>을 넣고 등록해 두세요.</div>`;
+    return;
+  }
+
+  box.innerHTML = `<div class="tbl-wrap"><table class="tbl"><thead><tr>
+      <th>적용 시작</th><th class="money">헬스장</th><th>기본/추가</th><th>기준일</th>
+      <th class="money">주차</th><th>기본/추가</th><th>기준일</th>
+      <th class="money">사물함</th><th>기준일</th><th>사유</th><th class="no-print">관리</th>
+    </tr></thead><tbody>` +
+    hist.map((r, i) => {
+      const active = r.effectYm <= cur && (i === 0 || hist[i - 1].effectYm > cur);
+      const future = r.effectYm > cur;
+      const used = getBillings().filter(b => b.feeSnapshot && b.feeSnapshot.effectYm === r.effectYm).length;
+      return `<tr${active ? ' style="background:var(--green-light)"' : ''}>
+        <td><b>${esc(r.effectYm)}</b>${active ? ' <span class="st-badge st-확정">적용중</span>' : ''}${future ? ' <span class="st-badge st-미확정">예정</span>' : ''}
+          ${used ? `<br><small style="color:var(--text2)">확정 ${used}건 사용</small>` : ''}</td>
+        <td class="money">${(r.gymFee || 0).toLocaleString()}</td><td>${r.gymBase}명 / +${(r.gymAdd || 0).toLocaleString()}</td><td>${r.gymCutDay || 0}일</td>
+        <td class="money">${(r.parkFee || 0).toLocaleString()}</td><td>${r.parkBase}대 / +${(r.parkAdd || 0).toLocaleString()}</td><td>${r.parkCutDay || 0}일</td>
+        <td class="money">${(r.lockerFee || 0).toLocaleString()}</td><td>${r.lockerCutDay || 0}일</td>
+        <td style="font-size:11px">${esc(r.memo) || '-'}<br><small style="color:var(--text2)">${new Date(r.createdAt).toLocaleDateString()} 등록</small></td>
+        <td class="no-print"><button class="btn btn-outline btn-sm" onclick="applyFeeToForm('${r.id}')">불러오기</button>
+          <button class="btn btn-red btn-sm" onclick="deleteFeeRevision('${r.id}')">삭제</button></td>
+      </tr>`;
+    }).join('') + `</tbody></table></div>`;
+}
+
+/* 과거 요금표를 입력칸으로 되불러오기 (수정 후 새 개정으로 재등록할 때) */
+function applyFeeToForm(id) {
+  const r = getFeeHistory().find(x => x.id == id); if (!r) return;
+  document.getElementById('s-gym-fee').value = r.gymFee;
+  document.getElementById('s-gym-add').value = r.gymAdd;
+  document.getElementById('s-gym-base').value = r.gymBase;
+  document.getElementById('s-gym-cut').value = r.gymCutDay;
+  document.getElementById('s-park-fee').value = r.parkFee;
+  document.getElementById('s-park-add').value = r.parkAdd;
+  document.getElementById('s-park-base').value = r.parkBase;
+  document.getElementById('s-park-cut').value = r.parkCutDay;
+  document.getElementById('s-locker-fee').value = r.lockerFee;
+  document.getElementById('s-locker-cut').value = r.lockerCutDay;
+  document.getElementById('fee-effect').value = r.effectYm;
+  document.getElementById('fee-memo').value = r.memo || '';
+  alert(`${r.effectYm} 요금표를 입력칸으로 불러왔습니다.\n값을 고친 뒤 [설정 저장] 또는 [현재 설정값을 이 연월부터 적용]을 누르세요.`);
+  scrollElIntoView(document.getElementById('s-gym-fee'), 90);
+}
+
+function renderAuditLog() {
+  const box = document.getElementById('audit-list'); if (!box) return;
+  const log = getAuditLog();
+  if (!log.length) { box.innerHTML = '<p class="tbl-empty">기록이 없습니다.</p>'; return; }
+  const color = { '부과확정': 'var(--accent)', '수납': 'var(--green)', '체납': 'var(--red)', '요금표': 'var(--purple)', '환경설정': 'var(--text2)' };
+  box.innerHTML = `<div class="tbl-wrap"><table class="tbl"><thead><tr><th style="width:150px">일시</th><th style="width:80px">구분</th><th>내용</th><th>상세</th></tr></thead><tbody>` +
+    log.map(l => `<tr><td style="font-size:11px">${new Date(l.at).toLocaleString()}</td>
+      <td><span class="st-badge" style="background:var(--bg);color:${color[l.cat] || 'var(--text2)'}">${esc(l.cat)}</span></td>
+      <td>${esc(l.action)}</td><td style="font-size:11px;color:var(--text2)">${esc(l.detail) || '-'}</td></tr>`).join('') +
+    `</tbody></table></div>`;
 }
 
 function renderDB() {
@@ -2459,7 +3678,10 @@ function autoFill(p) {
 
 function loadSettings() {
   document.getElementById('s-gym-fee').value = cfg.gymFee; document.getElementById('s-gym-base').value = cfg.gymBase; document.getElementById('s-gym-add').value = cfg.gymAdd;
-  document.getElementById('s-cut-day').value = cfg.cutDay; document.getElementById('s-park-fee').value = cfg.parkFee; document.getElementById('s-park-base').value = cfg.parkBase;
+  document.getElementById('s-gym-cut').value = cfg.gymCutDay;
+  document.getElementById('s-park-cut').value = cfg.parkCutDay;
+  document.getElementById('s-locker-cut').value = cfg.lockerCutDay;
+  document.getElementById('s-park-fee').value = cfg.parkFee; document.getElementById('s-park-base').value = cfg.parkBase;
   document.getElementById('s-park-add').value = cfg.parkAdd; document.getElementById('s-locker-fee').value = cfg.lockerFee; document.getElementById('s-bank').value = cfg.bank; document.getElementById('s-phone').value = cfg.phone;
   document.getElementById('s-buildings').value = cfg.buildings || 8;
   document.getElementById('s-households').value = cfg.households || 648;
@@ -2477,7 +3699,7 @@ function updateSettingsUI() {
     `• 헬스장: 기본 ${(cfg.gymFee||0).toLocaleString()}원 (${cfg.gymBase}명까지) / 추가 인원당 ${(cfg.gymAdd||0).toLocaleString()}원<br>` +
     `• 주차: 기본 ${(cfg.parkFee||0).toLocaleString()}원 (${cfg.parkBase}대까지) / 추가 대수당 ${(cfg.parkAdd||0).toLocaleString()}원<br>` +
     `• 사물함: 개당 ${(cfg.lockerFee||0).toLocaleString()}원<br>` +
-    `• 부과기준일: <b>헬스장만</b> 매월 ${cfg.cutDay}일 이후 등록 시 다음 달부터 부과<br>` +
+    `• 부과기준일: 헬스장 <b>${cfg.gymCutDay || 0}일</b> · 주차 <b>${cfg.parkCutDay || 0}일</b> · 사물함 <b>${cfg.lockerCutDay || 0}일</b> (0 = 당월부터 부과)<br>` +
     `&nbsp;&nbsp;(주차·사물함은 등록일과 무관하게 등록한 달부터 부과됩니다)<br>` +
     `• 해지: 해지일이 속한 달까지 부과 (일할계산 없음)<br>` +
     `<span style="color:var(--red)">• 주의: 고지서는 <b>출력 시점의 요금표</b>로 재계산됩니다. 요금을 인상하면 과거 달 고지서를 다시 뽑을 때 인상된 금액이 나옵니다. 확정된 고지서는 반드시 엑셀/PDF로 보관하세요.</span>`;
@@ -2520,7 +3742,27 @@ function saveSettings() {
   cfg.gymFee = parseInt(document.getElementById('s-gym-fee').value);
   cfg.gymBase = parseInt(document.getElementById('s-gym-base').value);
   cfg.gymAdd = parseInt(document.getElementById('s-gym-add').value);
-  cfg.cutDay = parseInt(document.getElementById('s-cut-day').value);
+  /* [v51] 시설별 부과기준일 */
+  const cuts = { gymCutDay: 's-gym-cut', parkCutDay: 's-park-cut', lockerCutDay: 's-locker-cut' };
+  for (const k in cuts) {
+    const v = parseInt(document.getElementById(cuts[k]).value);
+    if (isNaN(v) || v < 0 || v > 31) { alert('부과 기준일은 0~31 사이여야 합니다. (0 = 당월부터 부과)'); return; }
+    cfg[k] = v;
+  }
+
+  /* [v51] 요금을 바꿨는데 요금표 이력을 안 남기면 과거 고지서가 소급 변경된다.
+     v50까지는 이 경고가 없어 사용자가 알아차릴 방법이 없었다. */
+  const before = getFeeAt(ymStr());
+  const changed = FEE_FIELDS.filter(k => Number(before[k]) !== Number(cfg[k]));
+  if (changed.length) {
+    const unconfirmed = getBillings().length === 0;
+    const msg = `⚠️ 요금 정책이 변경되었습니다.\n\n` +
+      `이대로 저장하면 <b>미확정된 모든 달</b>의 부과액이 새 요금으로 다시 계산됩니다.\n` +
+      `(이미 확정한 달은 안전합니다)\n\n` +
+      `요금 인상·인하라면 [요금표 이력]에 "몇 월부터 적용"인지 등록하는 것을 권장합니다.\n\n` +
+      `그래도 저장하시겠습니까?`;
+    if (!confirm(msg.replace(/<\/?b>/g, ''))) return;
+  }
   cfg.parkFee = parseInt(document.getElementById('s-park-fee').value);
   cfg.parkBase = parseInt(document.getElementById('s-park-base').value);
   cfg.parkAdd = parseInt(document.getElementById('s-park-add').value);
@@ -2540,9 +3782,27 @@ function saveSettings() {
   updateSettingsUI();
   alert('✅ 설정이 저장되었습니다.');
 }
-function resetSettings() { if (!confirm('기본값으로 초기화하시겠습니까?')) return; cfg = { "gymFee": 10000, "gymAdd": 5000, "gymBase": 2, "parkFee": 30000, "parkAdd": 50000, "parkBase": 2, "lockerFee": 3000, "cutDay": 20, "bank": "농협 000-0000-0000-00", "phone": "054-000-0000", "buildings":8, "households":648 }; save(); rebuildDongs(); loadSettings(); updateHeaderInfo(); }
+function resetSettings() {
+  if (!confirm('요금·기준일·계좌·동수 설정을 기본값으로 되돌립니다.\n\n' +
+               '등록 데이터, 확정 부과, 수납 기록, 요금표 이력은 지워지지 않습니다.\n계속하시겠습니까?')) return;
+  cfg = Object.assign({}, DEFAULT_CFG);
+  save(); rebuildDongs(); loadSettings(); updateHeaderInfo();
+  auditLog('환경설정', '기본값 초기화', '');
+}
 
-function exportBackup() { const blob = new Blob([JSON.stringify({ gym: gymData, park: parkData, locker: lockerData, db: dbData, cfg: cfg })], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `아파트관리_백업_${todayStr()}.json`; a.click(); }
+function exportBackup() {
+  /* [v51] 확정 부과·수납·요금표 이력도 함께 담는다.
+     이게 빠지면 복구 후 '얼마 받았는지'가 통째로 사라진다. */
+  const payload = {
+    gym: gymData, park: parkData, locker: lockerData, db: dbData, cfg: cfg,
+    feeHistory: getFeeHistory(), billings: getBillings(), payments: getPayments(),
+    _v: 51, _at: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `아파트관리_부과백업_${todayStr()}.json`; a.click();
+  try { localStorage.setItem('apt_last_backup', new Date().toISOString()); } catch (e) {}
+}
 function importBackup(e) {
   const f = e.target.files[0]; if (!f) return;
   e.target.value = '';
@@ -2576,14 +3836,23 @@ function importBackup(e) {
     }
     const cnt = (d.gym||[]).length + (d.park||[]).length + (d.locker||[]).length;
     const now = gymData.length + parkData.length + lockerData.length;
+    const hasV51 = Array.isArray(d.billings) || Array.isArray(d.payments);
     if (!confirm(`복구를 진행하시겠습니까?\n\n` +
-                 `· 백업 파일: 부과 ${cnt}건 / 세대 ${(d.db||[]).length}건\n` +
-                 `· 현재 데이터: 부과 ${now}건 / 세대 ${dbData.length}건\n\n` +
-                 `현재 데이터는 삭제되고 백업 내용으로 교체됩니다.`)) return;
+                 `· 백업 파일: 부과 ${cnt}건 / 세대 ${(d.db||[]).length}건` +
+                 (hasV51 ? ` / 확정 ${(d.billings||[]).length}개월 / 수납 ${(d.payments||[]).length}건\n` : `\n  (v50 이하 백업 — 확정·수납 기록 없음)\n`) +
+                 `· 현재 데이터: 부과 ${now}건 / 세대 ${dbData.length}건` +
+                 ` / 확정 ${getBillings().length}개월 / 수납 ${getPayments().length}건\n\n` +
+                 (hasV51 ? `` : `⚠️ 이 파일에는 확정·수납 기록이 없습니다.\n   현재의 확정·수납 기록은 그대로 유지됩니다.\n\n`) +
+                 `현재 부과/세대 데이터는 삭제되고 백업 내용으로 교체됩니다.`)) return;
 
     gymData = d.gym || []; parkData = d.park || []; lockerData = d.locker || [];
-    dbData = d.db || []; if (d.cfg) cfg = d.cfg;
+    dbData = d.db || []; if (d.cfg) cfg = migrateCfg(d.cfg);
+    /* [v51] 확정 부과·수납·요금표 이력 복구 (구버전 파일이면 해당 키가 없으므로 건드리지 않는다) */
+    if (Array.isArray(d.feeHistory)) saveFeeHistory(d.feeHistory);
+    if (Array.isArray(d.billings)) saveBillings(d.billings);
+    if (Array.isArray(d.payments)) savePayments(d.payments);
     save();
+    auditLog('백업', '부과 데이터 복구', `부과 ${(d.gym||[]).length + (d.park||[]).length + (d.locker||[]).length}건`);
     alert('✅ 데이터 복구가 완료되었습니다.');
     location.reload();
   };
