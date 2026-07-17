@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>아파트이지(APT-EASY)AI-ERP V49.BETA</title>
+<title>아파트이지(APT-EASY) ERP V50 (버그수정판)</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 /* 고급스러운 디자인 및 다크모드 지원 CSS */
 :root {
@@ -24,6 +25,10 @@
   --amber-light: #fdf2e7;
   --purple: #6c5ce7;
   --purple-light: #f1eefc;
+  --green: #15795c;
+  --green-light: #e8f6f1;
+  --hover: #eef1f5;
+  --overlay: rgba(15,25,40,0.55);
   --shadow: 0 6px 24px rgba(20,30,50,0.06);
   --radius: 14px;
   --radius-sm: 9px;
@@ -47,6 +52,10 @@
   --amber-light: rgba(240, 161, 78, 0.12);
   --purple: #a47dec;
   --purple-light: rgba(164, 125, 236, 0.12);
+  --green: #2ecc8f;
+  --green-light: rgba(46, 204, 143, 0.12);
+  --hover: #232733;
+  --overlay: rgba(0,0,0,0.65);
   --shadow: 0 6px 24px rgba(0,0,0,0.4);
   --header-bg: linear-gradient(135deg, #07090d 0%, #161922 100%);
 }
@@ -614,12 +623,97 @@ tbody tr:last-child td { border-bottom: none; }
   }
 </style>
 </head>
+<!-- ============================================================ -->
+<!-- v50 수정: v49에서 통째로 누락되어 있던 필수 CSS               -->
+<!--  .modal / .badge / .alert / .tbl + 다크모드 하드코딩 색상 보정 -->
+<!-- ============================================================ -->
+<style>
+/* ===== 모달 (v49에 CSS가 전혀 없어 항상 펼쳐져 보이던 문제) ===== */
+.modal {
+  display: none;
+  position: fixed; inset: 0;
+  background: var(--overlay);
+  z-index: 5000;
+  overflow-y: auto;
+  padding: 40px 16px;
+  backdrop-filter: blur(3px);
+}
+.modal.open { display: block; }
+.modal-content {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 24px;
+  animation: modalPop .18s ease-out;
+}
+@keyframes modalPop { from { opacity:0; transform: translateY(-8px) scale(.98); } to { opacity:1; transform:none; } }
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 14px; margin-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-title { font-size: 17px; font-weight: 800; color: var(--text); }
+.modal-footer {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding-top: 16px; margin-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.modal .close {
+  cursor: pointer; font-size: 24px; line-height: 1;
+  color: var(--text2); font-weight: 700;
+  width: 30px; height: 30px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: .15s;
+}
+.modal .close:hover { background: var(--red-light); color: var(--red); }
+
+/* ===== 배지 / 알림박스 / 보조 테이블 (v49 미정의) ===== */
+.badge {
+  display: inline-block; padding: 3px 9px; border-radius: 12px;
+  font-size: 11px; font-weight: 800; line-height: 1.5; white-space: nowrap;
+}
+.alert { padding: 14px 16px; border-radius: var(--radius-sm); font-size: 13px; line-height: 1.9; }
+.alert-info { background: var(--accent-light); border: 1px solid var(--accent); color: var(--text); }
+.alert-warn { background: var(--amber-light); border: 1px solid var(--amber); color: var(--text); }
+table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.tbl thead th { background: var(--bg); padding: 12px 15px; font-weight: 700; font-size: 12px; color: var(--text2); text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.tbl tbody td { padding: 12px 15px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+table.tbl tbody tr:hover { background: var(--accent-light); }
+
+/* ===== 다크모드에서 흰 배경으로 굳어 글씨가 안 보이던 요소 보정 ===== */
+#office-ribbon-container { background: var(--card) !important; }
+#notif-list { background: var(--card) !important; }
+.legal-notif-item { background: var(--card) !important; color: var(--text); }
+.asset-item { background: var(--card) !important; color: var(--text); }
+.ribbon-btn { background: var(--card) !important; color: var(--text); }
+.ribbon-btn.active { background: var(--accent) !important; color: #fff; border-color: var(--accent); }
+.timeline-item::before { border-color: var(--card) !important; }
+.db-modal-list thead th { background: var(--hover) !important; }
+
+/* ===== 레이아웃: 백업 배너가 추가되며 하단이 잘리던 문제 ===== */
+html, body { height: 100%; }
+body { display: flex; flex-direction: column; }
+.main { flex: 1 1 auto; min-height: 0; height: auto !important; }
+.content { min-height: 0; }
+
+/* ===== 저장공간 사용량 표시 ===== */
+.storage-meter { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.storage-meter > i { display: block; height: 100%; background: var(--accent); transition: width .3s, background .3s; }
+
+@media print { .modal, .backup-banner, .bottom-ad-bar { display: none !important; } }
+</style>
+
 <body>
 
 <div class="header no-print">
   <div class="header-left">
-    <h1>🏢아파트이지(APT-EASY)ERP V49.BETA</h1>
-    <p>환경설정에서 요금부과설정 수정이 가능합니다</p>
+    <h1>🏢아파트이지(APT-EASY) ERP V50</h1>
+    <p>환경설정에서 요금부과설정 수정이 가능합니다 · 데이터는 이 브라우저에만 저장됩니다</p>
   </div>
   <div class="header-right">
     <!-- 오늘의집 버튼 -->
@@ -1042,7 +1136,7 @@ tbody tr:last-child td { border-bottom: none; }
         <div id="office-ai-app" style="margin-top:30px;">
           <div class="card" style="box-shadow:none; border:1px solid var(--border);">
             <div class="card-header" style="border-bottom:none; margin-bottom:10px; padding-bottom:0;">
-              <div class="card-title" style="font-size:15px;">🤖 AI 스마트 문서 작성 도우미</div>
+              <div class="card-title" style="font-size:15px;">📝 문서 자동 작성 도우미</div>
             </div>
             
             <div style="display:grid; grid-template-columns: 200px 1fr 1fr; gap:20px; min-height:400px; padding:15px;">
@@ -1067,13 +1161,17 @@ tbody tr:last-child td { border-bottom: none; }
               <div style="display:flex; flex-direction:column; gap:10px;">
                 <label style="display:block; font-size:12px; font-weight:700; color:var(--text2);">2. 핵심 키워드/내용 입력</label>
                 <textarea id="ai-input" style="flex:1; width:100%; padding:12px; border:1px solid var(--border); border-radius:8px; font-size:13px; resize:none; line-height:1.6;" placeholder="예) 승강기 정기점검&#10;7월15일 오전10시&#10;운행중단 2시간&#10;안전점검 실시"></textarea>
-                <button class="btn btn-primary" onclick="generateAiDoc()" style="width:100%; height:45px; font-weight:700;">✨ AI 문서 작성 시작</button>
+                <button class="btn btn-primary" onclick="generateAiDoc()" style="width:100%; height:45px; font-weight:700;">✨ 문서 작성</button>
+                <div style="font-size:11px; color:var(--text2); line-height:1.6;">
+                  ※ 인터넷 AI를 호출하는 기능이 아니라, 내장된 <b>정형 서식</b>에 입력 내용을 끼워 넣는 방식입니다.
+                  첫 줄=제목, 둘째 줄=일시로 인식하며, <b>출력된 문서는 반드시 검토 후 사용</b>하세요.
+                </div>
               </div>
 
               <!-- 우측: 결과창 -->
               <div style="display:flex; flex-direction:column; gap:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                  <label style="display:block; font-size:12px; font-weight:700; color:var(--text2);">3. AI 작성 결과</label>
+                  <label style="display:block; font-size:12px; font-weight:700; color:var(--text2);">3. 작성 결과 (검토 후 사용)</label>
                   <div style="display:flex; gap:5px;">
                     <button class="btn btn-outline btn-sm" onclick="copyAiResult()" style="padding:2px 8px;">복사</button>
                     <button class="btn btn-outline btn-sm" onclick="printAiResult()" style="padding:2px 8px;">인쇄</button>
@@ -1317,6 +1415,7 @@ tbody tr:last-child td { border-bottom: none; }
                 <div style="display:flex; gap:10px; justify-content:flex-end;">
                   <button class="btn btn-outline" onclick="printAssetHistory()">히스토리 출력</button>
                   <button class="btn btn-blue" onclick="editAssetCurrent()">정보 수정</button>
+                  <button class="btn btn-red" onclick="deleteAssetCurrent()">시설 삭제</button>
                 </div>
               </div>
 
@@ -1364,16 +1463,50 @@ tbody tr:last-child td { border-bottom: none; }
     <div id="page-dash" class="page active">
       <div id="dash-stat-grid" class="stat-grid"></div>
       <div class="card">
-        <div class="card-header"><div class="card-title">✨ v49 업데이트 안내</div></div>
+        <div class="card-header"><div class="card-title">🛠️ v50 수정 내역 (v49의 실제 결함 수정)</div></div>
+        <div class="alert alert-warn" style="margin-bottom:16px">
+          <b>v49에서 발견된 주요 결함</b><br>
+          ① <b>모달 CSS가 통째로 누락</b>되어 [법정점검 등록]·[시설 등록] 창이 관리업무센터에 항상 펼쳐진 채 노출됐습니다.<br>
+          ② <b>Chart.js를 부르는 &lt;script&gt; 태그가 없어서</b> 법정점검 통계 차트 2개가 영원히 "로드 중"이었습니다.<br>
+          ③ <b>editInspection() 함수가 두 번 선언</b>되어, [시설 점검 목록]의 수정 버튼이 엉뚱하게 법정점검 창을 열었습니다.<br>
+          ④ <b>환경설정의 [데이터 가져오기]가 형식이 다른 파일을 확인 없이 받아</b> 전 데이터를 삭제할 수 있었습니다.<br>
+          ⑤ <b>민원 사진을 원본 그대로 저장</b>해 브라우저 한도(5MB)를 넘기면 그 뒤로 <b>모든 저장이 조용히 실패</b>했습니다.<br>
+          ⑥ 오전 9시 이전에 등록하면 <b>날짜가 하루 전으로 기록</b>됐습니다 (UTC 기준 계산).<br>
+          ⑦ 다크모드에서 리본·알림·시설목록이 <b>흰 배경 + 흰 글씨</b>가 되어 읽을 수 없었습니다.
+        </div>
         <div style="line-height:1.8">
-          <p>• <b>버그 수정 (v49):</b> 아래 항목들이 수정되었습니다.</p>
+          <p>• <b>v49에서 이어받은 개선 사항:</b></p>
           <p>• <b>동 드롭다운 동기화:</b> 환경설정에서 동 수 변경 시 모든 동 선택 드롭다운이 즉시 갱신됩니다.</p>
           <p>• <b>전체 세대 자동생성:</b> 648세대 고정이 아닌 환경설정의 <b>동 수 / 세대 수</b>를 기반으로 동적 생성됩니다.</p>
           <p>• <b>호수 정렬 오류 수정:</b> 조회/고지서 출력에서 호수가 문자순(201 &lt; 99) 대신 숫자순(99 &lt; 201)으로 올바르게 정렬됩니다.</p>
           <p>• <b>항목 선택 필터 적용:</b> 부과 통합 조회에서 '헬스장/주차/사물함' 항목 선택이 실제 조회 결과에 반영됩니다.</p>
           <p>• <b>해지 관리 페이지 스타일 수정:</b> 헬스장/주차/사물함 해지 관리 페이지 헤더가 정상 표시됩니다.</p>
           <p>• <b>세대 DB 드롭다운 누락 수정:</b> 초기 로드 시 세대 DB 필터 드롭다운도 올바르게 초기화됩니다.</p>
-          <p>• <b>데이터삭제주의:</b> PC를 교체하거나 브라우저 초기화시 '데이터 내보내기(JSON)', '데이터 가져오기', '엑셀 파일 다운로드' 기능을 꼭 사용하십시오.</p>
+        </div>
+        <div style="line-height:1.9; margin-top:18px; padding-top:16px; border-top:1px solid var(--border)">
+          <p><b>v50에서 추가로 고친 것</b></p>
+          <p>• 관리업무센터를 드나들 때마다 대시보드에 카드가 <b>중복 누적</b>되던 문제</p>
+          <p>• 5초마다 화면 전체를 다시 그려 <b>체크박스 클릭이 씹히던</b> 문제 → 20초/해당 페이지에서만</p>
+          <p>• 리본 메뉴 클릭 시 <b>섹션 제목이 리본에 가려지던</b> 문제 (스크롤 대상이 window가 아니라 .content였음)</p>
+          <p>• 각 목록의 [수정] 버튼이 <b>입력 폼으로 스크롤되지 않던</b> 문제 (같은 원인)</p>
+          <p>• 법정점검 [완료] 처리 시 레코드가 <b>무한 증식</b>하던 문제 → 회차 롤오버 + 이력 분리</p>
+          <p>• 성명·메모에 <b>&lt; &gt; &amp; 문자</b>가 들어가면 표가 깨지던 문제</p>
+          <p>• 엑셀 일괄 업로드 시 <b>ID가 중복 생성</b>되어 수정/삭제가 엉뚱한 행에 걸리던 문제</p>
+          <p>• <b>시설 자산을 삭제할 방법이 없던</b> 문제 → 삭제 버튼 추가</p>
+          <p>• <b>우클릭 전면 차단</b> 제거 → 표의 전화번호 복사, 입력칸 붙여넣기 정상화</p>
+          <p>• [전체 세대 자동생성]이 <b>5라인 고정</b>이라 648세대가 640세대로 생성되던 문제 → 층·라인 직접 입력</p>
+          <p>• 환경설정 안내문이 <b>사실과 달랐던</b> 문제 (부과기준일은 헬스장에만 적용됨)</p>
+          <p>• 환경설정 비밀번호 <b>변경 기능</b> 추가, 저장공간 사용량 게이지 추가</p>
+        </div>
+        <div class="alert alert-warn" style="margin-top:18px">
+          <b>⚠️ 고치지 못한 구조적 한계 — 반드시 알고 쓰셔야 합니다</b><br>
+          <b>1. 고지서는 출력 시점의 요금표로 재계산됩니다.</b> 요금을 인상하면 지난달 고지서를 다시 뽑을 때 인상된 금액이 나옵니다.
+          확정한 고지서는 반드시 엑셀/PDF로 즉시 보관하세요.<br>
+          <b>2. 부과는 있는데 수납(입금 확인) 기능이 없습니다.</b> 누가 냈는지 이 프로그램은 모릅니다. 체납 관리는 수기 입력입니다.<br>
+          <b>3. 데이터는 이 브라우저 안에만 있습니다.</b> 캐시 삭제·PC 교체·브라우저 재설치 시 복구 불가입니다.<br>
+          <b>4. 입주민 성명·전화번호·차량번호는 개인정보입니다.</b> 평문으로 저장되고 백업 JSON도 평문입니다.
+          PC 로그인 암호·화면 잠금·백업 파일 관리는 사용자 책임입니다.<br>
+          <b>5. 변경 이력이 남지 않습니다.</b> 누가 언제 무엇을 지웠는지 추적할 수 없습니다.
         </div>
       </div>
     </div>
@@ -1583,9 +1716,40 @@ tbody tr:last-child td { border-bottom: none; }
         <div id="settings-summary" class="alert alert-info" style="margin-top:20px"></div>
       </div>
       <div class="card"><div class="card-header"><div class="card-title">📥 데이터 백업 및 복구</div></div>
-        <div style="display:flex;gap:10px;margin-top:15px">
-          <button class="btn btn-blue" onclick="exportBackup()">데이터 내보내기 (JSON)</button>
-          <label class="btn btn-outline" style="cursor:pointer">데이터 가져오기<input type="file" style="display:none" onchange="importBackup(event)"></label>
+        <div class="alert alert-warn" style="margin-bottom:15px">
+          <b>백업 파일은 두 종류입니다. 섞어서 넣지 마세요.</b><br>
+          · <b>전체 백업</b> (상단 주황 배너의 [전체 데이터 백업]) — 부과 + 업무센터 전부<br>
+          · <b>부과 백업</b> (아래 버튼) — 헬스장/주차/사물함/세대DB/환경설정만<br>
+          아래 [가져오기]는 두 형식을 모두 자동 인식합니다. 실행 전 반드시 확인창이 뜹니다.
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-blue" onclick="exportBackup()">부과 데이터 내보내기 (JSON)</button>
+          <button class="btn btn-primary" onclick="exportFullData()">전체 데이터 내보내기 (JSON)</button>
+          <label class="btn btn-outline" style="cursor:pointer">데이터 가져오기<input type="file" accept=".json,application/json" style="display:none" onchange="importBackup(event)"></label>
+        </div>
+      </div>
+      <div class="card"><div class="card-header"><div class="card-title">💾 저장공간 관리</div></div>
+        <div class="alert alert-warn" style="margin-bottom:15px">
+          이 프로그램은 데이터를 <b>이 브라우저 안에만</b> 보관합니다(약 5MB 한도).<br>
+          한도를 넘기면 <b>그 순간부터 모든 저장이 실패</b>합니다. 사진 첨부가 가장 큰 원인입니다.<br>
+          PC 교체·브라우저 초기화·시크릿 모드 종료 시 데이터는 <b>복구 불가</b>합니다.
+        </div>
+        <div id="storage-info" style="font-size:13px"></div>
+        <div style="display:flex;gap:10px;margin-top:15px;flex-wrap:wrap">
+          <button class="btn btn-outline" onclick="updateStorageMeter()">🔄 사용량 새로고침</button>
+          <button class="btn btn-red" onclick="purgeAttachments()">🧹 첨부 사진 일괄 정리</button>
+        </div>
+      </div>
+      <div class="card"><div class="card-header"><div class="card-title">🔐 환경설정 비밀번호</div></div>
+        <div class="alert alert-warn" style="margin-bottom:15px">
+          이 비밀번호는 <b>실수 방지용 잠금</b>이지 보안 장치가 아닙니다.
+          HTML 소스(Ctrl+U)를 열면 누구나 볼 수 있습니다. 입주민 개인정보가 들어 있는 프로그램이므로
+          <b>PC 자체의 로그인 암호와 화면 잠금</b>으로 보호하세요.
+        </div>
+        <div class="form-grid form-grid-3">
+          <div class="form-group"><label>현재 비밀번호</label><input type="password" id="pw-cur"></div>
+          <div class="form-group"><label>새 비밀번호</label><input type="password" id="pw-new"></div>
+          <div class="form-group" style="align-self:flex-end"><button class="btn btn-primary" style="width:100%" onclick="changeSettingsPw()">변경</button></div>
         </div>
       </div>
     </div>
@@ -1624,10 +1788,114 @@ tbody tr:last-child td { border-bottom: none; }
     </div>
   </div>
 </div>
+<script>
+/* ================================================================
+   v50 공용 헬퍼 (v49의 구조적 결함 보정)
+   ================================================================ */
+
+/* [FIX] v49는 어디서나 todayStr() 로 '오늘'을
+   구했음. toISOString()은 UTC 기준이라 한국(UTC+9)에서 오전 9시 이전에는
+   '어제' 날짜가 나온다. 관리사무소 8시 출근 → 등록일이 하루 밀림. */
+function todayStr(d) {
+  d = d || new Date();
+  return d.getFullYear() + '-' +
+         String(d.getMonth() + 1).padStart(2, '0') + '-' +
+         String(d.getDate()).padStart(2, '0');
+}
+function ymStr(d) { return todayStr(d).slice(0, 7); }
+
+/* [FIX] 성명·메모에 < > & " 가 들어가면 표가 깨지거나 스크립트가 실행됨 */
+function esc(v) {
+  if (v === null || v === undefined) return '';
+  return String(v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/* [FIX] v49는 localStorage.setItem 실패(용량초과)를 아무도 잡지 않았다.
+   사진 한 장 첨부로 5MB를 넘기면 그 순간부터 '저장 버튼을 눌러도
+   아무 일도 안 일어나는' 상태가 되고 사용자는 이유를 모른다. */
+function safeSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (err) {
+    console.error('저장 실패:', key, err);
+    alert('❌ 저장에 실패했습니다.\n\n브라우저 저장공간(약 5MB)이 가득 찼습니다.\n' +
+          '원인은 대부분 [민원 사진] 또는 [법정점검 첨부파일]입니다.\n\n' +
+          '조치:\n' +
+          ' 1) 지금 바로 [전체 데이터 백업(.json)] 을 눌러 파일로 보관하세요.\n' +
+          ' 2) 환경설정 > 저장공간 관리 에서 오래된 첨부 사진을 정리하세요.\n\n' +
+          '※ 이번에 입력한 내용은 저장되지 않았습니다.');
+    return false;
+  }
+}
+
+/* localStorage 총 사용량(byte, 대략) */
+function storageUsedBytes() {
+  var total = 0;
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    total += (k.length + (localStorage.getItem(k) || '').length) * 2;
+  }
+  return total;
+}
+
+/* [FIX] 스크롤 컨테이너는 window가 아니라 .content 다.
+   v49의 window.scrollTo({top:800}) 류는 전부 아무 동작도 하지 않았음. */
+function contentScrollTo(top) {
+  var c = document.querySelector('.content');
+  if (!c) { try { window.scrollTo({ top: top, behavior: 'smooth' }); } catch (e) {} return; }
+  if (typeof c.scrollTo === 'function') { try { c.scrollTo({ top: top, behavior: 'smooth' }); return; } catch (e) {} }
+  c.scrollTop = top;   /* 구형 브라우저 폴백 */
+}
+function scrollElIntoView(el, offset) {
+  if (!el) return;
+  var c = document.querySelector('.content');
+  if (!c) { try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} return; }
+  var top;
+  try {
+    top = el.getBoundingClientRect().top - c.getBoundingClientRect().top + c.scrollTop - (offset || 0);
+  } catch (e) { return; }
+  /* 스크롤은 부가기능이다. 여기서 예외가 나서 정작 '수정 폼에 값 채우기' 같은
+     본 작업이 중단되는 일이 없도록 전부 감싼다. */
+  contentScrollTo(Math.max(0, top));
+}
+
+/* 이미지 자동 축소 (첨부 사진이 localStorage를 터뜨리는 것 방지) */
+function compressImage(file, maxPx, quality) {
+  maxPx = maxPx || 1000; quality = quality || 0.7;
+  return new Promise(function (resolve, reject) {
+    if (!file.type || file.type.indexOf('image/') !== 0) { reject(new Error('이미지 아님')); return; }
+    var fr = new FileReader();
+    fr.onload = function (e) {
+      var img = new Image();
+      img.onload = function () {
+        var w = img.width, h = img.height;
+        var scale = Math.min(1, maxPx / Math.max(w, h));
+        var cv = document.createElement('canvas');
+        cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        resolve(cv.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = function () { reject(new Error('이미지 디코딩 실패')); };
+      img.src = e.target.result;
+    };
+    fr.onerror = function () { reject(new Error('파일 읽기 실패')); };
+    fr.readAsDataURL(file);
+  });
+}
+</script>
 
 <script>
 const KEYS = { GYM: 'apt_gym_v23', PARK: 'apt_park_v23', LOCKER: 'apt_locker_v23', DB: 'apt_db_v23', CFG: 'apt_cfg_v23', THEME: 'apt_theme_v23' };
-const SETTINGS_PW = '0217';
+const SETTINGS_PW = '0217';   /* 소스가 공개된 HTML이라 '잠금'이지 '보안'이 아님 */
+
+/* [FIX] v49는 모든 신규 레코드 id를 Date.now()로 만들었다.
+   엑셀 일괄 업로드처럼 같은 밀리초에 여러 건이 생기면 id가 겹쳐
+   '수정/삭제가 엉뚱한 행에 적용되는' 버그가 난다. */
+let _uidSeq = 0;
+function uid() { return Date.now() * 1000 + (_uidSeq = (_uidSeq + 1) % 1000); }
 
 let gymData = JSON.parse(localStorage.getItem(KEYS.GYM) || '[]');
 let parkData = JSON.parse(localStorage.getItem(KEYS.PARK) || '[]');
@@ -1648,11 +1916,11 @@ function rebuildDongs() {
 rebuildDongs();
 
 function save() {
-  localStorage.setItem(KEYS.GYM, JSON.stringify(gymData));
-  localStorage.setItem(KEYS.PARK, JSON.stringify(parkData));
-  localStorage.setItem(KEYS.LOCKER, JSON.stringify(lockerData));
-  localStorage.setItem(KEYS.DB, JSON.stringify(dbData));
-  localStorage.setItem(KEYS.CFG, JSON.stringify(cfg));
+  safeSet(KEYS.GYM, JSON.stringify(gymData));
+  safeSet(KEYS.PARK, JSON.stringify(parkData));
+  safeSet(KEYS.LOCKER, JSON.stringify(lockerData));
+  safeSet(KEYS.DB, JSON.stringify(dbData));
+  safeSet(KEYS.CFG, JSON.stringify(cfg));
 }
 
 function toggleTheme() {
@@ -1663,7 +1931,7 @@ function toggleTheme() {
 
 function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem(KEYS.THEME, theme);
+  safeSet(KEYS.THEME, theme);
   const icon = document.getElementById('theme-icon');
   const text = document.getElementById('theme-text');
   if (theme === 'dark') { icon.textContent = '☀️'; text.textContent = '라이트모드'; } 
@@ -1671,9 +1939,13 @@ function setTheme(theme) {
 }
 
 function showPage(name) {
+  const target = document.getElementById('page-' + name);
+  if (!target) { console.warn('page not found:', name); return; }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sidebar-menu a').forEach(a => a.classList.remove('active'));
-  document.getElementById('page-' + name).classList.add('active');
+  target.classList.add('active');
+  const c = document.querySelector('.content'); if (c) c.scrollTop = 0;   /* [FIX] 페이지 전환 시 스크롤 위치가 남아있던 문제 */
+  if (name !== 'office' && typeof stopRibbonTimer === 'function') stopRibbonTimer();
   const nav = document.getElementById('nav-' + name); if (nav) nav.classList.add('active');
   if (name === 'dash') renderDash();
   if (name === 'gym') renderList('gym');
@@ -1693,8 +1965,18 @@ function openSettingsAuth() {
   document.getElementById('pw-input').focus();
 }
 function closeSettingsAuth() { document.getElementById('pw-modal-overlay').style.display = 'none'; }
+function currentPw() { return localStorage.getItem('apt_pw_v50') || SETTINGS_PW; }
+function changeSettingsPw() {
+  const cur = document.getElementById('pw-cur').value;
+  const nw  = document.getElementById('pw-new').value.trim();
+  if (cur !== currentPw()) { alert('❌ 현재 비밀번호가 일치하지 않습니다.'); return; }
+  if (nw.length < 4) { alert('새 비밀번호는 4자 이상 입력하세요.'); return; }
+  if (!safeSet('apt_pw_v50', nw)) return;
+  document.getElementById('pw-cur').value = ''; document.getElementById('pw-new').value = '';
+  alert('✅ 비밀번호가 변경되었습니다.\n(백업 파일에도 함께 저장됩니다)');
+}
 function confirmSettingsPw() {
-  if (document.getElementById('pw-input').value === SETTINGS_PW) {
+  if (document.getElementById('pw-input').value === currentPw()) {
     closeSettingsAuth(); showPage('settings'); loadSettings();
   } else {
     document.getElementById('pw-error').style.display = 'block';
@@ -1725,7 +2007,7 @@ function addItem(type) {
 
   if (!d || !h || !n || !dt) { alert('⚠ 필수 항목(동, 호수, 성명, 등록일)을 입력해주세요.'); return; }
 
-  const obj = { id: Date.now().toString(36), dong: d, ho: h, name: n, date: dt, member: mem, phone: ph, cancelDate: null };
+  const obj = { id: uid().toString(36), dong: d, ho: h, name: n, date: dt, member: mem, phone: ph, cancelDate: null };
   if (type === 'park') { obj.carnum = document.getElementById('p-carnum').value.trim(); parkData.push(obj); }
   else if (type === 'gym') gymData.push(obj);
   else lockerData.push(obj);
@@ -1759,11 +2041,11 @@ function renderList(type) {
   let head = `<thead><tr><th>동</th><th>호수</th><th>성명</th><th>회원번호</th><th>전화번호</th>${type === 'park' ? '<th>차량번호</th>' : ''}<th>등록일</th><th>해지일</th><th>관리</th></tr></thead>`;
   el.innerHTML = `<div class="tbl-wrap"><table>${head}<tbody>` +
     filtered.map(r => `<tr class="${r.cancelDate ? 'cancelled-row' : ''}">
-      <td>${r.dong}동</td><td>${r.ho}호</td>
-      <td>${r.name} <button class="btn btn-outline btn-sm no-print" data-type="${type}" data-id="${r.id}" data-field="name" onclick="editField(this)">수정</button></td>
-      <td>${r.member || '-'}</td>
-      <td>${r.phone || '-'} <button class="btn btn-outline btn-sm no-print" data-type="${type}" data-id="${r.id}" data-field="phone" onclick="editField(this)">수정</button></td>
-      ${type === 'park' ? `<td>${r.carnum || '-'}</td>` : ''}
+      <td>${esc(r.dong)}동</td><td>${esc(r.ho)}호</td>
+      <td>${esc(r.name)} <button class="btn btn-outline btn-sm no-print" data-type="${type}" data-id="${r.id}" data-field="name" onclick="editField(this)">수정</button></td>
+      <td>${esc(r.member) || '-'}</td>
+      <td>${esc(r.phone) || '-'} <button class="btn btn-outline btn-sm no-print" data-type="${type}" data-id="${r.id}" data-field="phone" onclick="editField(this)">수정</button></td>
+      ${type === 'park' ? `<td>${esc(r.carnum) || '-'}</td>` : ''}
       <td>${r.date} <button class="btn btn-outline btn-sm no-print" data-type="${type}" data-id="${r.id}" data-datetype="reg" onclick="editDateFromBtn(this)">수정</button></td>
       <td>${r.cancelDate || '-'} <button class="btn btn-outline btn-sm no-print" data-type="${type}" data-id="${r.id}" data-datetype="can" onclick="editDateFromBtn(this)">수정</button></td>
       <td><button class="btn btn-red btn-sm no-print" data-type="${type}" data-id="${r.id}" onclick="cancelItemFromBtn(this)">해지</button> <button class="btn btn-red btn-sm no-print" data-type="${type}" data-id="${r.id}" onclick="deleteItemFromBtn(this)">삭제</button></td>
@@ -1825,7 +2107,7 @@ function cancelItemFromBtn(btn) { cancelItem(btn.getAttribute('data-type'), btn.
 function deleteItemFromBtn(btn) { deleteItem(btn.getAttribute('data-type'), btn.getAttribute('data-id')); }
 
 function cancelItem(type, id) {
-  const dt = prompt('해지일 입력 (YYYY-MM-DD)', new Date().toISOString().slice(0, 10));
+  const dt = prompt('해지일 입력 (YYYY-MM-DD)', todayStr());
   if (!dt) return;
   const data = type === 'gym' ? gymData : type === 'park' ? parkData : lockerData;
   const item = data.find(r => r.id === id); if (item) item.cancelDate = dt;
@@ -1899,9 +2181,9 @@ function runIntegratedQuery() {
       }
       return v.members.map((m, idx) => {
         if (idx === 0) {
-          return `<tr><td rowspan="${rowspan}"><button class="btn btn-red btn-sm no-print" data-dong="${v.dong}" data-ho="${v.ho}" data-ym="${ym}" onclick="deleteHouseholdFromBtn(this)">세대 전체삭제</button></td><td rowspan="${rowspan}">${v.dong}동</td><td rowspan="${rowspan}">${v.ho}호</td><td>${m.type}</td><td>${m.name}${m.carnum ? ' (' + m.carnum + ')' : ''}</td><td>${m.member || '-'}</td><td>${m.phone || '-'}</td><td rowspan="${rowspan}">${v.g.toLocaleString()}</td><td rowspan="${rowspan}">${v.p.toLocaleString()}</td><td rowspan="${rowspan}">${v.l.toLocaleString()}</td><td rowspan="${rowspan}"><b>${houseTotal}</b></td></tr>`;
+          return `<tr><td rowspan="${rowspan}"><button class="btn btn-red btn-sm no-print" data-dong="${v.dong}" data-ho="${v.ho}" data-ym="${ym}" onclick="deleteHouseholdFromBtn(this)">세대 전체삭제</button></td><td rowspan="${rowspan}">${v.dong}동</td><td rowspan="${rowspan}">${v.ho}호</td><td>${esc(m.type)}</td><td>${esc(m.name)}${m.carnum ? ' (' + esc(m.carnum) + ')' : ''}</td><td>${esc(m.member) || '-'}</td><td>${esc(m.phone) || '-'}</td><td rowspan="${rowspan}">${v.g.toLocaleString()}</td><td rowspan="${rowspan}">${v.p.toLocaleString()}</td><td rowspan="${rowspan}">${v.l.toLocaleString()}</td><td rowspan="${rowspan}"><b>${houseTotal}</b></td></tr>`;
         }
-        return `<tr><td>${m.type}</td><td>${m.name}${m.carnum ? ' (' + m.carnum + ')' : ''}</td><td>${m.member || '-'}</td><td>${m.phone || '-'}</td></tr>`;
+        return `<tr><td>${esc(m.type)}</td><td>${esc(m.name)}${m.carnum ? ' (' + esc(m.carnum) + ')' : ''}</td><td>${esc(m.member) || '-'}</td><td>${esc(m.phone) || '-'}</td></tr>`;
       }).join('');
     }).join('') + `</tbody></table></div></div>`;
   document.getElementById('query-result').innerHTML = html;
@@ -1937,13 +2219,14 @@ function generateBills() {
     const pFee = v.pc <= cfg.parkBase ? (v.pc > 0 ? cfg.parkFee : 0) : cfg.parkFee + (v.pc - cfg.parkBase) * cfg.parkAdd;
     const lFee = v.lc * cfg.lockerFee;
     html += `<div class="card" style="max-width:600px;margin:0 auto 30px;padding:30px;border:2px solid #ccc; background:#fff; color:#000"><div style="text-align:center;border-bottom:2px solid #1a7a5e;padding-bottom:10px;margin-bottom:20px"><h2 style="color:#1a7a5e">아파트 시설 이용료 부과 고지서</h2><p>${ym} 부과분</p></div>
-      <p style="margin-bottom:10px">🏠 세대: <b>${v.dong}동 ${v.ho}호</b> (${v.name} 귀하)</p>
+      <p style="margin-bottom:10px">🏠 세대: <b>${esc(v.dong)}동 ${esc(v.ho)}호</b> (${esc(v.name)} 귀하)</p>
       <div class="tbl-wrap"><table><thead><tr><th style="color:#333">항목</th><th style="color:#333">내용</th><th style="text-align:right;color:#333">금액</th></tr></thead><tbody>
         <tr><td>헬스장 이용료</td><td>${v.gc}명 이용</td><td style="text-align:right">${gFee.toLocaleString()}원</td></tr>
         <tr><td>주차 이용료</td><td>${v.pc}대 등록</td><td style="text-align:right">${pFee.toLocaleString()}원</td></tr>
         <tr><td>사물함 이용료</td><td>${v.lc}개 사용</td><td style="text-align:right">${lFee.toLocaleString()}원</td></tr>
         <tr style="background:#f8f9fa;font-weight:700"><td>합계</td><td></td><td style="text-align:right">${(gFee + pFee + lFee).toLocaleString()}원</td></tr>
-      </tbody></table></div><div style="margin-top:20px;font-size:12px;color:#666;text-align:center">계좌: ${cfg.bank} | 문의: ${cfg.phone}</div></div>`;
+      </tbody></table></div><div style="margin-top:20px;font-size:12px;color:#666;text-align:center">계좌: ${esc(cfg.bank)} | 문의: ${esc(cfg.phone)}</div>
+      <div style="margin-top:6px;font-size:10px;color:#999;text-align:center">※ 본 고지서는 출력 시점(${todayStr()})의 요금표 기준으로 산출되었습니다.</div></div>`;
   });
   document.getElementById('bill-result').innerHTML = html || '<p class="tbl-empty">내역이 없습니다.</p>';
 }
@@ -2000,7 +2283,7 @@ function addDB() {
   const sameUnit = dbData.find(i => i.dong === d && i.ho === h);
   if (sameUnit) {
     // 가족구성원 추가 (신규 레코드 push)
-    dbData.push({ dong: d, ho: h, name: n, member: mb, phone: ph, date: new Date().toISOString().split('T')[0] });
+    dbData.push({ dong: d, ho: h, name: n, member: mb, phone: ph, date: todayStr() });
     save(); renderDBList();
     ['gym','park','locker'].forEach(t => { if(document.getElementById(t+'-list')) renderList(t); });
     const familyNames = dbData.filter(i => i.dong === d && i.ho === h).map(i => i.name).join(', ');
@@ -2010,35 +2293,72 @@ function addDB() {
   }
 
   // 새 세대 신규 등록
-  dbData.push({ dong: d, ho: h, name: n, member: mb, phone: ph, date: new Date().toISOString().split('T')[0] });
+  dbData.push({ dong: d, ho: h, name: n, member: mb, phone: ph, date: todayStr() });
   save(); renderDBList();
   ['gym','park','locker'].forEach(t => { if(document.getElementById(t+'-list')) renderList(t); });
   if(al) al.innerHTML = '<div style="color:#1a7a5e;font-size:13px;margin-top:6px">✅ 신규 세대가 등록되었습니다.</div>';
   setTimeout(() => { if(al) al.innerHTML = ''; }, 3000);
 }
 function deleteDB(idx) { if (!confirm('삭제하시겠습니까?')) return; dbData.splice(idx, 1); save(); renderDBList(); }
-function clearAllDB() { if (!confirm('정말 모든 세대 데이터를 초기화하시겠습니까?')) return; dbData = []; save(); renderDBList(); }
+function clearAllDB() {
+  /* [FIX] v49는 확인창 한 번이면 전 세대 명부가 사라졌다.
+     환경설정은 비밀번호로 잠가놓고, 정작 더 치명적인 이 버튼은 무방비였다. */
+  if (!dbData.length) { alert('삭제할 세대 데이터가 없습니다.'); return; }
+  if (!confirm(`⚠️ 세대 명부 ${dbData.length}건이 전부 삭제됩니다.\n삭제 후 복구할 수 없습니다.\n\n계속하시겠습니까?`)) return;
+  const t = prompt(`정말 삭제하려면 아래에 [전체삭제] 라고 정확히 입력하세요.\n\n삭제 전에 [전체 데이터 백업]을 먼저 받으시길 강력히 권합니다.`);
+  if (t !== '전체삭제') { alert('취소되었습니다.'); return; }
+  dbData = []; save(); renderDBList();
+  alert('세대 데이터가 초기화되었습니다.');
+}
 function autoGenDB() {
+  /* [FIX] v49는 라인 수를 5로 못박고 층수를 반올림했다.
+     8개동 648세대면 648/8=81, 81/5=16.2 → 16층 → 8×16×5=640세대.
+     8세대가 소리 없이 사라졌고, 4라인·2라인 단지는 아예 맞지 않았다.
+     → 층수/라인수를 직접 입력받고, 실제 생성 결과를 미리 보여준다. */
   const totalBuildings = cfg.buildings || 8;
-  const totalHouseholds = cfg.households || 648;
-  // 세대수 / 동수로 동당 세대수 계산 (층당 세대 구조 추정)
-  const unitsPerBuilding = Math.round(totalHouseholds / totalBuildings);
-  // 층당 세대 수(라인 수) 추정: 1~5라인이 일반적
-  const linesPerFloor = 5; // 기본 5라인 (01~05)
-  const floors = Math.round(unitsPerBuilding / linesPerFloor);
-  if (!confirm(`${totalBuildings}개동 × ${floors}층 × ${linesPerFloor}라인 = ${totalBuildings * floors * linesPerFloor}세대를 자동으로 생성하시겠습니까? (기존 데이터 유지)`)) return;
-  const today = new Date().toISOString().split('T')[0];
+  const totalHouseholds = cfg.households || 0;
+  const perBuilding = totalBuildings ? Math.round(totalHouseholds / totalBuildings) : 0;
+
+  const linesIn = prompt(
+    `【전체 세대 자동생성】\n\n` +
+    `환경설정 기준: ${totalBuildings}개동 / ${totalHouseholds}세대 (동당 약 ${perBuilding}세대)\n\n` +
+    `1단계 — 한 층에 몇 세대(라인)입니까?\n예) 01~04호면 4`,
+    '4');
+  if (linesIn === null) return;
+  const lines = parseInt(linesIn);
+  if (!lines || lines < 1 || lines > 20) { alert('라인 수는 1~20 사이로 입력하세요.'); return; }
+
+  const suggest = lines ? Math.ceil(perBuilding / lines) : 15;
+  const floorsIn = prompt(
+    `2단계 — 몇 층까지 있습니까?\n(권장값: ${suggest}층 → ${totalBuildings}×${suggest}×${lines}=${totalBuildings*suggest*lines}세대)`,
+    String(suggest));
+  if (floorsIn === null) return;
+  const floors = parseInt(floorsIn);
+  if (!floors || floors < 1 || floors > 100) { alert('층수는 1~100 사이로 입력하세요.'); return; }
+
+  const willMake = totalBuildings * floors * lines;
+  const diff = totalHouseholds ? willMake - totalHouseholds : 0;
+  if (!confirm(
+    `${totalBuildings}개동 × ${floors}층 × ${lines}라인 = ${willMake}세대를 생성합니다.\n` +
+    (totalHouseholds ? `환경설정의 ${totalHouseholds}세대와 ${diff === 0 ? '일치합니다.' : (diff > 0 ? diff + '세대 많습니다.' : Math.abs(diff) + '세대 적습니다.')}\n` : '') +
+    `\n· 이미 등록된 동·호수는 건드리지 않습니다.\n· 층·라인이 불규칙한 단지는 생성 후 직접 정리하세요.\n\n진행할까요?`)) return;
+
+  const today = todayStr();
+  let added = 0;
+  const exists = new Set(dbData.map(i => i.dong + '-' + i.ho));
   DONGS.forEach(d => {
     for (let f = 1; f <= floors; f++) {
-      for (let l = 1; l <= linesPerFloor; l++) {
+      for (let l = 1; l <= lines; l++) {
         const ho = (f * 100 + l).toString();
-        if (!dbData.find(i => i.dong === d && i.ho === ho)) {
+        if (!exists.has(d + '-' + ho)) {
           dbData.push({ dong: d, ho: ho, name: '', member: '', phone: '', date: today });
+          exists.add(d + '-' + ho); added++;
         }
       }
     }
   });
   save(); renderDBList();
+  alert(`✅ ${added}세대를 새로 생성했습니다. (기존 ${willMake - added}세대는 유지)`);
 }
 function renderDBList() {
   const filter = document.getElementById('db-filter').value;
@@ -2060,9 +2380,9 @@ function renderDBList() {
     const tr = document.createElement('tr');
     // 같은 동호 두 번째 이후 구성원은 동·호 칸 비워서 그룹임을 시각적으로 표현
     const dongCell = isSameUnit ? `<td style="color:var(--text2);padding-left:28px">└ 가족</td><td></td>` : `<td>${i.dong}동</td><td>${i.ho}호</td>`;
-    tr.innerHTML = `${dongCell}<td>${i.name||''}</td><td>${i.member||'-'}</td><td>${i.phone||'-'}</td><td>${i.date||''}</td>
-      <td><button class="btn btn-outline btn-sm" data-dong="${i.dong}" data-ho="${i.ho}" data-name="${(i.name||'').replace(/"/g,'&quot;')}" onclick="editDBFromBtn(this)">수정</button></td>
-      <td><button class="btn btn-red btn-sm" data-dong="${i.dong}" data-ho="${i.ho}" data-name="${(i.name||'').replace(/"/g,'&quot;')}" onclick="deleteDBFromBtn(this)">삭제</button></td>`;
+    tr.innerHTML = `${dongCell}<td>${esc(i.name)}</td><td>${esc(i.member)||'-'}</td><td>${esc(i.phone)||'-'}</td><td>${esc(i.date)}</td>
+      <td><button class="btn btn-outline btn-sm" data-dong="${esc(i.dong)}" data-ho="${esc(i.ho)}" data-name="${esc(i.name)}" onclick="editDBFromBtn(this)">수정</button></td>
+      <td><button class="btn btn-red btn-sm" data-dong="${esc(i.dong)}" data-ho="${esc(i.ho)}" data-name="${esc(i.name)}" onclick="deleteDBFromBtn(this)">삭제</button></td>`;
     tbody.appendChild(tr);
     prevKey = key;
   });
@@ -2083,7 +2403,7 @@ function editDBFromBtn(btn) {
   document.getElementById('db-name-input').value = i.name || '';
   document.getElementById('db-member-input').value = i.member || '';
   document.getElementById('db-phone-input').value = i.phone || '';
-  document.getElementById('db-dong-input').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  scrollElIntoView(document.getElementById('db-dong-input'), 120);
 }
 function editDB(dong, ho, name) { editDBFromBtn({ getAttribute: (k) => k==='data-dong'?dong : k==='data-ho'?ho : (name||'') }); }
 function deleteDBFromBtn(btn) {
@@ -2130,8 +2450,8 @@ function renderDBModal() {
     return;
   }
   tbody.innerHTML = list.map(i =>
-    `<tr data-dong="${i.dong}" data-ho="${i.ho}" data-name="${(i.name||'').replace(/"/g,'&quot;')}" data-member="${i.member||''}" data-phone="${i.phone||''}" onclick="selectFromDB(this)">
-      <td>${i.dong}동</td><td>${i.ho}호</td><td><b>${i.name||''}</b></td><td>${i.member||'-'}</td><td>${i.phone||'-'}</td>
+    `<tr data-dong="${esc(i.dong)}" data-ho="${esc(i.ho)}" data-name="${esc(i.name)}" data-member="${esc(i.member)}" data-phone="${esc(i.phone)}" onclick="selectFromDB(this)">
+      <td>${esc(i.dong)}동</td><td>${esc(i.ho)}호</td><td><b>${esc(i.name)}</b></td><td>${esc(i.member)||'-'}</td><td>${esc(i.phone)||'-'}</td>
     </tr>`
   ).join('');
 }
@@ -2174,7 +2494,55 @@ function loadSettings() {
   updateSettingsUI();
 }
 function updateHeaderInfo(){document.getElementById('header-세대').textContent=`${cfg.buildings||8}개동 ${cfg.households||648}세대`;}
-function updateSettingsUI() { document.getElementById('settings-summary').innerHTML = `• 아파트 정보: ${cfg.buildings||8}개동 / ${cfg.households||648}세대<br>• 헬스장: 기본 ${cfg.gymFee.toLocaleString()}원 (${cfg.gymBase}명까지) / 추가 ${cfg.gymAdd.toLocaleString()}원<br>• 주차: 기본 ${cfg.parkFee.toLocaleString()}원 (${cfg.parkBase}대까지) / 추가 ${cfg.parkAdd.toLocaleString()}원<br>• 사물함: 개당 ${cfg.lockerFee.toLocaleString()}원<br>• 부과기준: 매월 ${cfg.cutDay}일 이후 등록 시 다음 달부터 부과`; }
+function updateSettingsUI() {
+  /* [FIX] v49 요약문은 "매월 N일 이후 등록 시 다음 달부터 부과"라고 안내했지만,
+     코드상 이 규칙은 헬스장에만 적용된다(isActive의 isGym=true 인자).
+     주차·사물함은 몇 일에 등록하든 당월부터 부과된다.
+     기존 부과 결과가 바뀌지 않도록 동작은 그대로 두고, 안내문만 사실에 맞춘다. */
+  document.getElementById('settings-summary').innerHTML =
+    `• 아파트 정보: ${esc(cfg.buildings||8)}개동 / ${esc(cfg.households||648)}세대<br>` +
+    `• 헬스장: 기본 ${(cfg.gymFee||0).toLocaleString()}원 (${cfg.gymBase}명까지) / 추가 인원당 ${(cfg.gymAdd||0).toLocaleString()}원<br>` +
+    `• 주차: 기본 ${(cfg.parkFee||0).toLocaleString()}원 (${cfg.parkBase}대까지) / 추가 대수당 ${(cfg.parkAdd||0).toLocaleString()}원<br>` +
+    `• 사물함: 개당 ${(cfg.lockerFee||0).toLocaleString()}원<br>` +
+    `• 부과기준일: <b>헬스장만</b> 매월 ${cfg.cutDay}일 이후 등록 시 다음 달부터 부과<br>` +
+    `&nbsp;&nbsp;(주차·사물함은 등록일과 무관하게 등록한 달부터 부과됩니다)<br>` +
+    `• 해지: 해지일이 속한 달까지 부과 (일할계산 없음)<br>` +
+    `<span style="color:var(--red)">• 주의: 고지서는 <b>출력 시점의 요금표</b>로 재계산됩니다. 요금을 인상하면 과거 달 고지서를 다시 뽑을 때 인상된 금액이 나옵니다. 확정된 고지서는 반드시 엑셀/PDF로 보관하세요.</span>`;
+  updateStorageMeter();
+}
+
+/* [ADD] 브라우저 저장공간 사용량 표시 (약 5MB 한도, 넘으면 전부 저장 실패) */
+function updateStorageMeter() {
+  const el = document.getElementById('storage-info');
+  if (!el) return;
+  const used = storageUsedBytes();
+  const limit = 5 * 1024 * 1024;
+  const pct = Math.min(100, Math.round(used / limit * 100));
+  const color = pct >= 80 ? 'var(--red)' : pct >= 50 ? 'var(--amber)' : 'var(--accent)';
+  el.innerHTML =
+    `사용 중: <b style="color:${color}">${(used/1024/1024).toFixed(2)} MB</b> / 약 5 MB (${pct}%)` +
+    `<div class="storage-meter"><i style="width:${pct}%; background:${color}"></i></div>` +
+    (pct >= 70 ? `<div style="margin-top:8px;color:var(--red);font-weight:700">⚠ 저장공간이 얼마 남지 않았습니다. 백업 후 오래된 첨부 사진을 정리하세요.</div>` : '');
+}
+
+/* [ADD] 첨부 사진 일괄 정리 (저장공간을 잡아먹는 주범) */
+function purgeAttachments() {
+  const civils = JSON.parse(localStorage.getItem(CIV_KEY) || '[]');
+  const withPhoto = civils.filter(c => c.photo);
+  const legals = JSON.parse(localStorage.getItem(LEGAL_KEY) || '[]');
+  const withFile = legals.filter(l => l.file);
+  if (!withPhoto.length && !withFile.length) { alert('정리할 첨부파일이 없습니다.'); return; }
+  if (!confirm(`첨부파일을 모두 삭제해 저장공간을 확보합니다.\n\n` +
+               `· 민원 사진: ${withPhoto.length}건\n· 법정점검 첨부: ${withFile.length}건\n\n` +
+               `※ 민원/점검 기록 자체는 남고, 첨부 이미지만 삭제됩니다.\n` +
+               `※ 되돌릴 수 없으니 먼저 [전체 데이터 백업]을 받아두세요.\n\n계속할까요?`)) return;
+  civils.forEach(c => { delete c.photo; });
+  legals.forEach(l => { l.file = null; });
+  safeSet(CIV_KEY, JSON.stringify(civils));
+  safeSet(LEGAL_KEY, JSON.stringify(legals));
+  alert('✅ 첨부파일을 정리했습니다.');
+  updateStorageMeter();
+}
 function saveSettings() {
   cfg.gymFee = parseInt(document.getElementById('s-gym-fee').value);
   cfg.gymBase = parseInt(document.getElementById('s-gym-base').value);
@@ -2201,8 +2569,54 @@ function saveSettings() {
 }
 function resetSettings() { if (!confirm('기본값으로 초기화하시겠습니까?')) return; cfg = { "gymFee": 10000, "gymAdd": 5000, "gymBase": 2, "parkFee": 30000, "parkAdd": 50000, "parkBase": 2, "lockerFee": 3000, "cutDay": 20, "bank": "농협 000-0000-0000-00", "phone": "054-000-0000", "buildings":8, "households":648 }; save(); rebuildDongs(); loadSettings(); updateHeaderInfo(); }
 
-function exportBackup() { const blob = new Blob([JSON.stringify({ gym: gymData, park: parkData, locker: lockerData, db: dbData, cfg: cfg })], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `아파트관리_백업_${new Date().toISOString().slice(0, 10)}.json`; a.click(); }
-function importBackup(e) { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = (ev) => { try { const d = JSON.parse(ev.target.result); gymData = d.gym || []; parkData = d.park || []; lockerData = d.locker || []; dbData = d.db || []; cfg = d.cfg || cfg; save(); alert('✅ 데이터 복구가 완료되었습니다.'); location.reload(); } catch(err) { alert('❌ 올바른 백업 파일이 아닙니다.'); } }; r.readAsText(f); }
+function exportBackup() { const blob = new Blob([JSON.stringify({ gym: gymData, park: parkData, locker: lockerData, db: dbData, cfg: cfg })], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `아파트관리_백업_${todayStr()}.json`; a.click(); }
+function importBackup(e) {
+  const f = e.target.files[0]; if (!f) return;
+  e.target.value = '';
+  const r = new FileReader();
+  r.onload = (ev) => {
+    let d;
+    try { d = JSON.parse(ev.target.result); }
+    catch (err) { alert('❌ JSON 형식이 아닙니다. 백업 파일을 확인하세요.'); return; }
+
+    // [FIX] v49는 여기서 검증 없이 gymData=[] 로 덮어써서 전 데이터를 날렸다.
+    // 전체백업(.json, {data:{...}} 구조) 파일이면 통합 복구 루틴으로 넘긴다.
+    if (d && d.data && typeof d.data === 'object') {
+      if (!confirm('📦 [전체 데이터 백업] 파일로 확인되었습니다.\n' +
+                   '이 파일로 전체 복구를 진행하시겠습니까?\n' +
+                   '(현재 브라우저의 모든 데이터가 교체됩니다)')) return;
+      try {
+        localStorage.clear();
+        Object.keys(d.data).forEach(k => localStorage.setItem(k, d.data[k]));
+        alert('✅ 전체 데이터 복구가 완료되었습니다. 새로고침합니다.');
+        location.reload();
+      } catch (err) { alert('❌ 복구 실패: ' + err.message); }
+      return;
+    }
+
+    // 구형(부과 데이터 전용) 백업 검증
+    const hasAny = ['gym','park','locker','db','cfg'].some(k => d && d[k] !== undefined);
+    if (!hasAny) {
+      alert('❌ 이 프로그램의 백업 파일이 아닙니다.\n\n' +
+            '기존 데이터는 그대로 유지했습니다.');
+      return;
+    }
+    const cnt = (d.gym||[]).length + (d.park||[]).length + (d.locker||[]).length;
+    const now = gymData.length + parkData.length + lockerData.length;
+    if (!confirm(`복구를 진행하시겠습니까?\n\n` +
+                 `· 백업 파일: 부과 ${cnt}건 / 세대 ${(d.db||[]).length}건\n` +
+                 `· 현재 데이터: 부과 ${now}건 / 세대 ${dbData.length}건\n\n` +
+                 `현재 데이터는 삭제되고 백업 내용으로 교체됩니다.`)) return;
+
+    gymData = d.gym || []; parkData = d.park || []; lockerData = d.locker || [];
+    dbData = d.db || []; if (d.cfg) cfg = d.cfg;
+    save();
+    alert('✅ 데이터 복구가 완료되었습니다.');
+    location.reload();
+  };
+  r.onerror = () => alert('❌ 파일을 읽을 수 없습니다.');
+  r.readAsText(f);
+}
 function renderDash() { const uniqueUnits = new Set(dbData.map(i => i.dong + '-' + i.ho)).size; document.getElementById('dash-stat-grid').innerHTML = `<div class="stat-card green"><div class="s-label">🏃 헬스장 이용</div><div class="s-val">${gymData.filter(r => !r.cancelDate).length}명</div></div><div class="stat-card blue"><div class="s-label">🚗 주차 등록</div><div class="s-val">${parkData.filter(r => !r.cancelDate).length}대</div></div><div class="stat-card purple"><div class="s-label">📦 사물함 사용</div><div class="s-val">${lockerData.filter(r => !r.cancelDate).length}개</div></div><div class="stat-card amber"><div class="s-label">🏘️ 전체 세대</div><div class="s-val">${uniqueUnits}세대</div></div>`; }
 
 function exportToExcel() {
@@ -2232,12 +2646,77 @@ function exportToExcel() {
   const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "부과내역"); XLSX.writeFile(wb, `아파트시설부과_${ym}.xlsx`);
 }
 
+/* [ADD] 문제 발생 시 F12 콘솔에서 데이터를 확인할 수 있게 노출 */
+Object.defineProperty(window, 'aptDebug', { get: () => ({
+  gym: gymData, park: parkData, locker: lockerData, db: dbData, cfg: cfg,
+  usedMB: (storageUsedBytes() / 1024 / 1024).toFixed(2)
+}) });
+
 window.onload = () => {
   document.getElementById('header-date').textContent = new Date().toLocaleDateString();
   rebuildDongs(); // 동 드롭다운 최초 초기화 (DOM 로드 후)
   const savedTheme = localStorage.getItem(KEYS.THEME) || 'light'; setTheme(savedTheme);
+  updateHeaderInfo();
   showPage('dash');
+  checkEnvironment();
 };
+
+/* ================================================================
+   [ADD] v49에 없던 실행환경 점검
+   ================================================================ */
+function checkEnvironment() {
+  const warn = [];
+
+  /* 1) 외부 라이브러리 로드 실패 (인터넷 차단된 관리사무소 PC에서 흔함)
+        v49는 XLSX가 없으면 엑셀 버튼이 아무 반응 없이 죽었고,
+        Chart는 아예 로드조차 안 했다. */
+  if (typeof XLSX === 'undefined') warn.push('엑셀 내보내기 기능(XLSX)');
+  if (typeof Chart === 'undefined') warn.push('법정점검 통계 차트(Chart.js)');
+  if (warn.length) {
+    console.warn('CDN 로드 실패:', warn);
+    const b = document.createElement('div');
+    b.className = 'no-print';
+    b.style.cssText = 'background:var(--red-light);color:var(--red);padding:10px 18px;margin:10px 20px 0;border:1px solid var(--red);border-radius:8px;font-size:12px;font-weight:700';
+    b.innerHTML = '⚠️ 인터넷 연결이 없어 다음 기능을 쓸 수 없습니다: ' + warn.join(', ') +
+                  '<br><span style="font-weight:400">그 외 등록·조회·인쇄 기능은 정상 동작합니다. 사내망 차단이라면 라이브러리 파일을 HTML에 직접 넣는 방식으로 바꿔야 합니다.</span>';
+    document.body.insertBefore(b, document.querySelector('.main'));
+  }
+
+  /* 2) 시크릿/사생활 보호 모드 → 창을 닫는 순간 데이터가 전부 사라진다 */
+  try {
+    localStorage.setItem('__probe__', '1'); localStorage.removeItem('__probe__');
+  } catch (e) {
+    alert('🚨 이 브라우저에서는 데이터를 저장할 수 없습니다.\n\n' +
+          '시크릿(사생활 보호) 모드이거나 저장이 차단된 상태입니다.\n' +
+          '입력한 내용이 전부 사라지니 일반 창에서 열어주세요.');
+  }
+
+  /* 3) file:// 로 열었을 때: 크롬은 모든 file:// 페이지가 저장소를 공유한다.
+        구글연동 버전과 이 버전을 같은 PC에서 파일로 열면 서로 데이터를 덮어쓴다. */
+  if (location.protocol === 'file:') {
+    const seen = localStorage.getItem('apt_app_signature');
+    const mine = 'v50-nogoogle';
+    if (seen && seen !== mine) {
+      alert('⚠️ 데이터 충돌 주의\n\n' +
+            '이 브라우저의 저장소를 다른 버전("' + seen + '")이 이미 사용 중입니다.\n' +
+            '파일(file://)로 열면 여러 HTML이 같은 저장소를 공유하므로\n' +
+            '두 버전을 번갈아 쓰면 데이터가 서로 덮어써집니다.\n\n' +
+            '한 PC에서는 한 버전만 사용하시거나, 서로 다른 브라우저로 분리하세요.');
+    }
+    safeSet('apt_app_signature', mine);
+  }
+
+  /* 4) 마지막 백업 이후 경과일 안내 */
+  const last = localStorage.getItem('apt_last_backup');
+  if (last) {
+    const days = Math.floor((new Date() - new Date(last)) / 86400000);
+    if (days >= 7) {
+      const el = document.querySelector('.backup-banner-text');
+      if (el) el.innerHTML = `🚨 <b>마지막 백업으로부터 ${days}일이 지났습니다.</b> 지금 [전체 데이터 백업]을 눌러 파일로 보관하세요. ` +
+        `브라우저 캐시 삭제·PC 교체 시 데이터는 <b>복구할 수 없습니다.</b>`;
+    }
+  }
+}
 </script>
 
 <!-- DB 불러오기 모달 -->
@@ -2276,13 +2755,21 @@ window.onload = () => {
 <div id="donation-banner">☕ 커피 한 잔 후원으로 개발자를 응원해주세요!</div>
 
 <script>
+  /* [FIX] v49는 화면 전체의 우클릭을 막았다. 그 대가로 관리소 직원이
+     표의 전화번호를 복사하거나, 입력칸에 붙여넣거나, 링크를 새 탭으로
+     여는 것까지 전부 막혔다. 소스보기(Ctrl+U)/F12는 어차피 열리므로
+     보호 효과는 0이고 불편만 남았다.
+     → 입력 요소와 표에서는 우클릭을 정상 허용하고, 그 외 여백에서만
+       후원 배너를 잠깐 띄운다. */
   document.addEventListener('contextmenu', function(event) {
-    event.preventDefault();
+    const t = event.target;
+    if (t.closest('input, textarea, select, table, a, .modal, [contenteditable]')) return;
+    if (window.getSelection && String(window.getSelection())) return;  // 드래그 선택 중이면 복사 허용
     const banner = document.getElementById('donation-banner');
+    if (!banner) return;
     banner.style.display = 'block';
-    setTimeout(() => {
-      banner.style.display = 'none';
-    }, 3000); // 3초 후 자동 숨김
+    clearTimeout(window._donationTimer);
+    window._donationTimer = setTimeout(() => { banner.style.display = 'none'; }, 3000);
   });
 
 // --- 업무일정관리 (Add Only) ---
@@ -2308,7 +2795,7 @@ function saveSchedule() {
     }
   } else {
     schedules.push({
-      id: Date.now(),
+      id: uid(),
       title,
       date,
       repeat,
@@ -2316,7 +2803,7 @@ function saveSchedule() {
     });
   }
 
-  localStorage.setItem(SCHED_KEY, JSON.stringify(schedules));
+  safeSet(SCHED_KEY, JSON.stringify(schedules));
   clearSchedForm();
   renderSchedule();
 }
@@ -2334,7 +2821,7 @@ function toggleSchedComplete(id) {
   const idx = schedules.findIndex(s => s.id == id);
   if (idx > -1) {
     schedules[idx].completed = !schedules[idx].completed;
-    localStorage.setItem(SCHED_KEY, JSON.stringify(schedules));
+    safeSet(SCHED_KEY, JSON.stringify(schedules));
     renderSchedule();
   }
 }
@@ -2343,7 +2830,7 @@ function deleteSchedule(id) {
   if (!confirm('정말 삭제하시겠습니까?')) return;
   let schedules = getSchedules();
   schedules = schedules.filter(s => s.id != id);
-  localStorage.setItem(SCHED_KEY, JSON.stringify(schedules));
+  safeSet(SCHED_KEY, JSON.stringify(schedules));
   renderSchedule();
 }
 
@@ -2356,7 +2843,7 @@ function editSchedule(id) {
     document.getElementById('sched-repeat').value = item.repeat;
     document.getElementById('sched-edit-id').value = item.id;
     document.getElementById('sched-save-btn').textContent = '수정하기';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollElIntoView(document.getElementById('office-schedule-app'), 190);
   }
 }
 
@@ -2365,7 +2852,7 @@ function renderSchedule() {
   if (!tbody) return;
   
   let schedules = getSchedules();
-  const todayStr = new Date().toISOString().split('T')[0];
+  const _today = todayStr();   /* [FIX] 지역변수명이 헬퍼 함수명과 충돌하지 않도록 분리 */
   
   // 정렬: 미완료 우선, 날짜순
   schedules.sort((a, b) => {
@@ -2376,7 +2863,7 @@ function renderSchedule() {
   tbody.innerHTML = schedules.length ? '' : '<tr><td colspan="6" class="tbl-empty">등록된 일정이 없습니다.</td></tr>';
   
   schedules.forEach(s => {
-    const isToday = s.date === todayStr;
+    const isToday = s.date === _today;
     const dDay = calculateDDay(s.date);
     const dDayClass = dDay === 0 ? 'd-day-today' : (dDay > 0 && dDay <= 3 ? 'd-day-urgent' : '');
     const dDayText = dDay === 0 ? 'D-Day' : (dDay > 0 ? `D-${dDay}` : `D+${Math.abs(dDay)}`);
@@ -2387,8 +2874,8 @@ function renderSchedule() {
     
     tr.innerHTML = `
       <td style="text-align:center;"><input type="checkbox" ${s.completed ? 'checked' : ''} onclick="toggleSchedComplete(${s.id})"></td>
-      <td class="${s.completed ? 'sched-completed' : ''}">${s.title}</td>
-      <td>${s.date}</td>
+      <td class="${s.completed ? 'sched-completed' : ''}">${esc(s.title)}</td>
+      <td>${esc(s.date)}</td>
       <td><span class="d-day-badge ${dDayClass}">${dDayText}</span></td>
       <td>${s.repeat !== 'none' ? `<span class="repeat-badge">${repeatText}</span>` : '-'}</td>
       <td style="text-align:center;">
@@ -2439,12 +2926,12 @@ function saveArrears() {
     }
   } else {
     arrears.push({
-      id: Date.now(),
+      id: uid(),
       dong, ho, name, amount, months, date, memo
     });
   }
 
-  localStorage.setItem(ARR_KEY, JSON.stringify(arrears));
+  safeSet(ARR_KEY, JSON.stringify(arrears));
   clearArrForm();
   renderArrears();
 }
@@ -2464,7 +2951,7 @@ function clearArrForm() {
 function deleteArrears(id) {
   if (!confirm('정말 삭제하시겠습니까?')) return;
   let arrears = getArrears().filter(a => a.id != id);
-  localStorage.setItem(ARR_KEY, JSON.stringify(arrears));
+  safeSet(ARR_KEY, JSON.stringify(arrears));
   renderArrears();
 }
 
@@ -2480,7 +2967,7 @@ function editArrears(id) {
     document.getElementById('arr-memo').value = item.memo;
     document.getElementById('arr-edit-id').value = item.id;
     document.getElementById('arr-save-btn').textContent = '수정하기';
-    window.scrollTo({ top: 400, behavior: 'smooth' });
+    scrollElIntoView(document.getElementById('office-arrears-app'), 190);
   }
 }
 
@@ -2505,13 +2992,13 @@ function renderArrears() {
   arrears.forEach(a => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${a.dong}</td>
-      <td>${a.ho}</td>
-      <td>${a.name}</td>
+      <td>${esc(a.dong)}</td>
+      <td>${esc(a.ho)}</td>
+      <td>${esc(a.name)}</td>
       <td>${parseInt(a.amount || 0).toLocaleString()}원</td>
       <td>${a.months || 0}개월</td>
-      <td>${a.date || '-'}</td>
-      <td style="font-size:12px; color:var(--text2);">${a.memo || '-'}</td>
+      <td>${esc(a.date) || '-'}</td>
+      <td style="font-size:12px; color:var(--text2);">${esc(a.memo) || '-'}</td>
       <td style="text-align:center;">
         <button class="btn btn-outline btn-sm" onclick="editArrears(${a.id})">수정</button>
         <button class="btn btn-red btn-sm" onclick="deleteArrears(${a.id})">삭제</button>
@@ -2538,7 +3025,7 @@ function exportArrearsToExcel() {
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "체납관리");
-  XLSX.writeFile(wb, `체납관리명단_${new Date().toISOString().split('T')[0]}.xlsx`);
+  XLSX.writeFile(wb, `체납관리명단_${todayStr()}.xlsx`);
 }
 // --- 체납관리 끝 ---
 
@@ -2568,13 +3055,13 @@ function saveInspection() {
     }
   } else {
     inspections.push({
-      id: Date.now(),
+      id: uid(),
       name, date, worker, result, memo, photo,
       completed: false
     });
   }
 
-  localStorage.setItem(INS_KEY, JSON.stringify(inspections));
+  safeSet(INS_KEY, JSON.stringify(inspections));
   clearInsForm();
   renderInspection();
 }
@@ -2595,7 +3082,7 @@ function toggleInsComplete(id) {
   const idx = inspections.findIndex(i => i.id == id);
   if (idx > -1) {
     inspections[idx].completed = !inspections[idx].completed;
-    localStorage.setItem(INS_KEY, JSON.stringify(inspections));
+    safeSet(INS_KEY, JSON.stringify(inspections));
     renderInspection();
   }
 }
@@ -2603,11 +3090,15 @@ function toggleInsComplete(id) {
 function deleteInspection(id) {
   if (!confirm('정말 삭제하시겠습니까?')) return;
   let inspections = getInspections().filter(i => i.id != id);
-  localStorage.setItem(INS_KEY, JSON.stringify(inspections));
+  safeSet(INS_KEY, JSON.stringify(inspections));
   renderInspection();
 }
 
-function editInspection(id) {
+/* [FIX] v49는 이 함수와 법정점검의 editInspection() 이름이 완전히 같아서
+   나중에 선언된 법정점검 쪽이 이 함수를 덮어썼다. 그 결과 [시설 점검 목록]의
+   '수정' 버튼을 누르면 법정점검 모달이 열리고 정작 수정은 되지 않았다.
+   이름을 editFacilityInspection() 으로 분리한다. */
+function editFacilityInspection(id) {
   const item = getInspections().find(i => i.id == id);
   if (item) {
     document.getElementById('ins-name').value = item.name;
@@ -2618,7 +3109,7 @@ function editInspection(id) {
     document.getElementById('ins-photo').value = item.photo;
     document.getElementById('ins-edit-id').value = item.id;
     document.getElementById('ins-save-btn').textContent = '수정하기';
-    window.scrollTo({ top: 800, behavior: 'smooth' });
+    scrollElIntoView(document.getElementById('office-inspection-app'), 190);
   }
 }
 
@@ -2645,14 +3136,14 @@ function renderInspection() {
     
     tr.innerHTML = `
       <td style="text-align:center;"><input type="checkbox" ${i.completed ? 'checked' : ''} onclick="toggleInsComplete(${i.id})"></td>
-      <td class="${i.completed ? 'sched-completed' : ''}">${i.name}</td>
-      <td>${i.date}</td>
-      <td>${i.worker || '-'}</td>
-      <td style="color:${resultColor}; font-weight:700;">${i.result}</td>
-      <td style="font-size:12px; color:var(--text2);">${i.memo || '-'}</td>
-      <td>${i.photo ? (i.photo.startsWith('http') ? `<a href="${i.photo}" target="_blank">🔗보기</a>` : i.photo) : '-'}</td>
+      <td class="${i.completed ? 'sched-completed' : ''}">${esc(i.name)}</td>
+      <td>${esc(i.date)}</td>
+      <td>${esc(i.worker) || '-'}</td>
+      <td style="color:${resultColor}; font-weight:700;">${esc(i.result)}</td>
+      <td style="font-size:12px; color:var(--text2);">${esc(i.memo) || '-'}</td>
+      <td>${i.photo ? (/^https?:\/\//.test(i.photo) ? `<a href="${esc(i.photo)}" target="_blank" rel="noopener">🔗보기</a>` : esc(i.photo)) : '-'}</td>
       <td style="text-align:center;">
-        <button class="btn btn-outline btn-sm" onclick="editInspection(${i.id})">수정</button>
+        <button class="btn btn-outline btn-sm" onclick="editFacilityInspection(${i.id})">수정</button>
         <button class="btn btn-red btn-sm" onclick="deleteInspection(${i.id})">삭제</button>
       </td>
     `;
@@ -2677,7 +3168,7 @@ function exportInspectionToExcel() {
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "시설점검");
-  XLSX.writeFile(wb, `시설점검목록_${new Date().toISOString().split('T')[0]}.xlsx`);
+  XLSX.writeFile(wb, `시설점검목록_${todayStr()}.xlsx`);
 }
 // --- 시설점검 끝 ---
 
@@ -2685,18 +3176,26 @@ function exportInspectionToExcel() {
 const CIV_KEY = 'office_civil';
 
 // 사진 첨부 시 Base64 변환 처리
+/* [FIX] v49는 원본 사진을 base64 그대로 localStorage에 넣었다.
+   요즘 폰 사진 한 장(3~5MB)이면 base64로 4~7MB → 브라우저 한도(약 5MB) 초과 →
+   setItem이 예외를 던지는데 아무도 잡지 않아서 '저장 버튼을 눌러도 아무 일도
+   일어나지 않는' 상태가 됐다. 최대 1000px / JPEG 70%로 자동 압축한다. */
 document.addEventListener('change', function(e) {
   if (e.target && e.target.id === 'civ-file') {
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = function(event) {
-        document.getElementById('civ-photo-base64').value = event.target.result;
-        document.getElementById('civ-preview').src = event.target.result;
-        document.getElementById('civ-preview-container').style.display = 'block';
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+    compressImage(file, 1000, 0.7).then(function(dataUrl) {
+      const kb = Math.round(dataUrl.length * 0.75 / 1024);
+      if (kb > 900) {
+        alert('사진 용량이 커서(' + kb + 'KB) 저장공간을 많이 차지합니다.\n필요하면 더 작은 사진을 사용하세요.');
+      }
+      document.getElementById('civ-photo-base64').value = dataUrl;
+      document.getElementById('civ-preview').src = dataUrl;
+      document.getElementById('civ-preview-container').style.display = 'block';
+    }).catch(function(err) {
+      alert('❌ 이미지 파일만 첨부할 수 있습니다. (' + err.message + ')');
+      e.target.value = '';
+    });
   }
 });
 
@@ -2719,7 +3218,7 @@ function saveCivil() {
   if (!requester || !title) { alert('요청자(세대)와 민원내용은 필수입니다.'); return; }
 
   let civils = getCivils();
-  const now = new Date().toISOString().split('T')[0];
+  const now = todayStr();
 
   if (editId) {
     const idx = civils.findIndex(c => c.id == editId);
@@ -2732,14 +3231,14 @@ function saveCivil() {
     }
   } else {
     civils.push({
-      id: Date.now(),
+      id: uid(),
       type, priority, requester, contact, title, worker, status, memo, photo,
       regDate: now,
       finishDate: status === '완료' ? now : ''
     });
   }
 
-  localStorage.setItem(CIV_KEY, JSON.stringify(civils));
+  safeSet(CIV_KEY, JSON.stringify(civils));
   clearCivForm();
   renderCivil();
 }
@@ -2763,7 +3262,7 @@ function clearCivForm() {
 function deleteCivil(id) {
   if (!confirm('민원 내역을 삭제하시겠습니까?')) return;
   let civils = getCivils().filter(c => c.id != id);
-  localStorage.setItem(CIV_KEY, JSON.stringify(civils));
+  safeSet(CIV_KEY, JSON.stringify(civils));
   renderCivil();
 }
 
@@ -2787,7 +3286,7 @@ function editCivil(id) {
     }
     document.getElementById('civ-edit-id').value = item.id;
     document.getElementById('civ-save-btn').textContent = '수정 내용 저장';
-    window.scrollTo({ top: 1200, behavior: 'smooth' });
+    scrollElIntoView(document.getElementById('office-civil-app'), 190);
   }
 }
 
@@ -2816,18 +3315,18 @@ function renderCivil() {
     const prioClass = c.priority === '긴급' ? 'civ-prio-긴급' : '';
     
     tr.innerHTML = `
-      <td><span class="civ-status-${c.status}">${c.status}</span></td>
-      <td>${c.type}</td>
-      <td class="${prioClass}">${c.priority}</td>
+      <td><span class="civ-status-${esc(c.status)}">${esc(c.status)}</span></td>
+      <td>${esc(c.type)}</td>
+      <td class="${prioClass}">${esc(c.priority)}</td>
       <td>
-        <div style="font-weight:700;">${c.title}</div>
-        <div style="font-size:11px; color:var(--text2);">${c.memo || ''}</div>
+        <div style="font-weight:700;">${esc(c.title)}</div>
+        <div style="font-size:11px; color:var(--text2);">${esc(c.memo) || ''}</div>
         ${c.photo ? `<span class="civ-photo-btn" onclick="viewCivPhoto('${c.id}')">🖼️ 사진보기</span>` : ''}
       </td>
-      <td>${c.requester}<br><span style="font-size:11px; color:var(--text2);">${c.contact || ''}</span></td>
-      <td>${c.regDate}</td>
-      <td>${c.finishDate || '-'}</td>
-      <td>${c.worker || '-'}</td>
+      <td>${esc(c.requester)}<br><span style="font-size:11px; color:var(--text2);">${esc(c.contact) || ''}</span></td>
+      <td>${esc(c.regDate)}</td>
+      <td>${esc(c.finishDate) || '-'}</td>
+      <td>${esc(c.worker) || '-'}</td>
       <td style="text-align:center;">
         <button class="btn btn-outline btn-sm" onclick="editCivil(${c.id})">수정</button>
         <button class="btn btn-red btn-sm" onclick="deleteCivil(${c.id})">삭제</button>
@@ -2841,7 +3340,7 @@ function viewCivPhoto(id) {
   const item = getCivils().find(c => c.id == id);
   if (item && item.photo) {
     const win = window.open("");
-    win.document.write(`<img src="${item.photo}" style="max-width:100%;">`);
+    win.document.write(`<img src="${esc(item.photo)}" style="max-width:100%;">`);
   }
 }
 
@@ -2865,7 +3364,7 @@ function exportCivilToExcel() {
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "민원관리");
-  XLSX.writeFile(wb, `민원관리목록_${new Date().toISOString().split('T')[0]}.xlsx`);
+  XLSX.writeFile(wb, `민원관리목록_${todayStr()}.xlsx`);
 }
 // --- 민원관리 끝 ---
 
@@ -2897,10 +3396,10 @@ function saveInventory() {
       inventory[idx] = { ...inventory[idx], name, cat, spec, loc, stock, min, vendor, worker, memo };
     }
   } else {
-    inventory.push({ id: Date.now(), name, cat, spec, loc, stock, min, vendor, worker, memo });
+    inventory.push({ id: uid(), name, cat, spec, loc, stock, min, vendor, worker, memo });
   }
 
-  localStorage.setItem(INV_KEY, JSON.stringify(inventory));
+  safeSet(INV_KEY, JSON.stringify(inventory));
   clearInvForm();
   renderInventory();
   updateInventoryDash(); // 대시보드 알림 업데이트
@@ -2925,7 +3424,7 @@ function updateStock(id, amount) {
   const idx = inventory.findIndex(i => i.id == id);
   if (idx > -1) {
     inventory[idx].stock = Math.max(0, inventory[idx].stock + amount);
-    localStorage.setItem(INV_KEY, JSON.stringify(inventory));
+    safeSet(INV_KEY, JSON.stringify(inventory));
     renderInventory();
     updateInventoryDash();
   }
@@ -2933,7 +3432,7 @@ function updateStock(id, amount) {
 
 function deleteInventory(id) {
   if (!confirm('품목을 삭제하시겠습니까?')) return;
-  localStorage.setItem(INV_KEY, JSON.stringify(getInventory().filter(i => i.id != id)));
+  safeSet(INV_KEY, JSON.stringify(getInventory().filter(i => i.id != id)));
   renderInventory();
   updateInventoryDash();
 }
@@ -2952,7 +3451,7 @@ function editInventory(id) {
     document.getElementById('inv-memo').value = item.memo || '';
     document.getElementById('inv-edit-id').value = item.id;
     document.getElementById('inv-save-btn').textContent = '수정 내용 저장';
-    window.scrollTo({ top: 1600, behavior: 'smooth' });
+    scrollElIntoView(document.getElementById('office-inventory-app'), 190);
   }
 }
 
@@ -2971,9 +3470,9 @@ function renderInventory() {
     const tr = document.createElement('tr');
     if (isShort) tr.className = 'inv-shortage';
     tr.innerHTML = `
-      <td>${i.cat || '-'}</td>
-      <td><div style="font-weight:700;">${i.name}</div><div style="font-size:11px; color:var(--text2);">${i.spec || ''}</div></td>
-      <td>${i.loc || '-'}</td>
+      <td>${esc(i.cat) || '-'}</td>
+      <td><div style="font-weight:700;">${esc(i.name)}</div><div style="font-size:11px; color:var(--text2);">${esc(i.spec) || ''}</div></td>
+      <td>${esc(i.loc) || '-'}</td>
       <td style="text-align:right; font-weight:700;">${i.stock.toLocaleString()}</td>
       <td style="text-align:right; color:var(--text2);">${i.min.toLocaleString()}</td>
       <td><span class="${isShort ? 'inv-badge-short' : 'inv-badge-ok'}">${isShort ? '재고부족' : '정상'}</span></td>
@@ -3029,7 +3528,7 @@ function exportInventoryToExcel() {
   })));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "재고관리");
-  XLSX.writeFile(wb, `재고관리현황_${new Date().toISOString().split('T')[0]}.xlsx`);
+  XLSX.writeFile(wb, `재고관리현황_${todayStr()}.xlsx`);
 }
 
 function importInventoryFromExcel(event) {
@@ -3045,7 +3544,7 @@ function importInventoryFromExcel(event) {
     let inventory = getInventory();
     json.forEach(row => {
       inventory.push({
-        id: Date.now() + Math.random(),
+        id: uid(),
         cat: row['분류'] || '',
         name: row['품목명'] || '이름없음',
         spec: row['규격'] || '',
@@ -3057,7 +3556,7 @@ function importInventoryFromExcel(event) {
         memo: row['메모'] || ''
       });
     });
-    localStorage.setItem(INV_KEY, JSON.stringify(inventory));
+    safeSet(INV_KEY, JSON.stringify(inventory));
     renderInventory();
     updateInventoryDash();
     alert(`${json.length}건의 데이터를 가져왔습니다.`);
@@ -3070,8 +3569,30 @@ function importInventoryFromExcel(event) {
 const AI_KEY = 'office_ai';
 let currentAiType = '공지문';
 
+/* [FIX] v49는 버튼이 10개인데 안내문구(placeholder)는 4개, 실제 서식은
+   공지문·체납독촉장·민원답변 3개뿐이었다. 나머지 7개를 누르면 전부
+   똑같은 껍데기 문서가 나왔다. 10종을 모두 채운다. */
+const AI_PLACEHOLDERS = {
+  '공지문': '예) 승강기 정기점검\n7월 15일 10:00~12:00\n1~2호 라인 운행중단',
+  '안내문': '예) 여름철 수도 계량기 검침\n7월 20일~22일\n세대 방문 예정',
+  '민원답변': '예) 층간소음 민원\n현장확인 완료\n해당 세대 주의 조치\n야간 순찰 강화',
+  '체납독촉장': '예) 101동 101호 홍길동\n3개월 체납 50만원\n7월 20일까지 납부요망',
+  '작업지시서': '예) 지하주차장 배수펌프 교체\n7월 18일 09:00\n담당: 시설과 김주임',
+  '회의록': '예) 7월 정기 입대위 회의\n단지 도색 공사 건\n업체 선정 방식 논의',
+  '시설점검결과': '예) 101동 승강기\n7월 15일 점검\n와이어 마모 확인, 교체 필요',
+  '안전교육자료': '예) 동절기 화재예방 교육\n전 직원 대상\n7월 25일 14:00 관리사무소',
+  '입주민 안내문': '예) 재활용 분리배출 요일 변경\n8월 1일부터\n화·금 → 수·토',
+  '공문': '예) 수신: ㅇㅇ구청 주택과\n제목: 승강기 교체공사 신고\n관련: 승강기안전관리법 제28조'
+};
+
 function initAiDoc() {
-  // 초기화 로직이 필요하면 여기에 작성
+  /* [FIX] v49의 initAiDoc()은 빈 함수여서, 첫 진입 시 안내문구가
+     '공지문'용으로 세팅되지 않은 채로 남아 있었다. */
+  const inp = document.getElementById('ai-input');
+  if (inp && !inp.dataset.inited) {
+    inp.placeholder = AI_PLACEHOLDERS['공지문'];
+    inp.dataset.inited = '1';
+  }
 }
 
 function setAiDocType(type, btn) {
@@ -3079,13 +3600,7 @@ function setAiDocType(type, btn) {
   document.querySelectorAll('.ai-type-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   
-  const placeholders = {
-    '공지문': '예) 승강기 점검, 7/15, 10시~12시, 운행중단',
-    '체납독촉장': '예) 101동 101호, 홍길동, 3개월 체납, 50만원, 20일까지 납부요망',
-    '민원답변': '예) 층간소음 민원, 현장확인 완료, 해당 세대 주의 조치, 향후 관리 강화',
-    '회의록': '예) 7월 정기 입대위 회의, 단지 도색 공사 건, 업체 선정 방식 논의'
-  };
-  document.getElementById('ai-input').placeholder = placeholders[type] || '핵심 내용을 키워드 중심으로 입력하세요.';
+  document.getElementById('ai-input').placeholder = AI_PLACEHOLDERS[type] || '핵심 내용을 키워드 중심으로 입력하세요.';
 }
 
 function generateAiDoc() {
@@ -3093,10 +3608,12 @@ function generateAiDoc() {
   if (!input) { alert('내용을 입력해주세요.'); return; }
   
   const resultArea = document.getElementById('ai-result');
-  resultArea.innerHTML = "📝 AI가 문서를 작성 중입니다...";
+  resultArea.innerHTML = "📝 문서를 작성하는 중입니다...";
   
   setTimeout(() => {
     const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+    const L = input.split('\n');            // 줄 단위 입력
+    const body = L.slice(1).join('\n') || input;
     let content = "";
     
     // 템플릿 엔진 (Prompt Template 방식)
@@ -3106,16 +3623,28 @@ function generateAiDoc() {
       content = `[미납 관리비 납부 독촉 안내]\n\n귀 세대의 평안을 기원합니다.\n\n관리사무소에서 확인한 결과, 귀 세대의 관리비가 현재 미납된 상태입니다.\n\n■ 대상: ${input.split('\n')[0] || '해당 세대'}\n■ 체납 내역: ${input}\n\n관리비는 단지의 원활한 운영을 위해 필수적인 재원입니다. 미납 시 가산금이 발생할 수 있으니 기한 내 납부를 간곡히 부탁드립니다.\n\n이미 납부하셨다면 본 안내는 폐기해주시기 바랍니다.\n\n${today}\n\nㅇㅇ아파트 관리사무소장`;
     } else if (currentAiType === '민원답변') {
       content = `[민원 사항 처리에 대한 답변]\n\n안녕하십니까. 관리사무소입니다.\n접수해주신 민원 사항에 대해 아래와 같이 조치 및 답변 드립니다.\n\n■ 민원 요지: ${input.split('\n')[0]}\n■ 처리 결과: ${input}\n\n항상 입주민의 목소리에 귀 기울이는 관리사무소가 되겠습니다. 추가 문의사항은 관리사무소로 연락 주시기 바랍니다.\n\n${today}\n\nㅇㅇ아파트 관리사무소`;
+    } else if (currentAiType === '안내문' || currentAiType === '입주민 안내문') {
+      content = `[안 내 문]\n\n입주민 여러분의 가정에 늘 평안이 함께하기를 기원합니다.\n\n아래와 같이 안내드리오니 협조하여 주시기 바랍니다.\n\n■ 제목: ${L[0]}\n■ 일시: ${L[1] || '아래 내용 참조'}\n■ 내용:\n${body}\n\n입주민 여러분의 많은 협조를 부탁드립니다.\n\n${today}\n\nㅇㅇ아파트 관리사무소장 (직인생략)`;
+    } else if (currentAiType === '작업지시서') {
+      content = `[작 업 지 시 서]\n\n■ 작업명: ${L[0]}\n■ 작업일시: ${L[1] || ''}\n■ 작업장소: ${L[2] || ''}\n■ 담당(업체):\n■ 세부 지시사항:\n${body}\n\n■ 안전조치 사항\n 1. 작업 전 안전교육 및 보호구 착용 확인\n 2. 작업구역 통제선 설치 및 입주민 통행 안내\n 3. 고소·전기·밀폐공간 작업 시 2인 1조 원칙 준수\n\n■ 완료보고: 작업 종료 즉시 관리사무소에 결과 보고\n\n${today}\n\n지시자: ㅇㅇ아파트 관리사무소장 (인)\n수령자: ______________ (서명)`;
+    } else if (currentAiType === '회의록') {
+      content = `[회 의 록]\n\n■ 회의명: ${L[0]}\n■ 일시: ${L[1] || today}\n■ 장소: ${L[2] || '관리사무소 회의실'}\n■ 참석자: \n\n■ 안건\n${body}\n\n■ 논의 내용\n 1. \n 2. \n\n■ 결정 사항\n 1. \n 2. \n\n■ 향후 조치(담당/기한)\n 1. \n\n작성자: ______________\n작성일: ${today}`;
+    } else if (currentAiType === '시설점검결과') {
+      content = `[시설물 점검 결과 보고]\n\n■ 점검 시설: ${L[0]}\n■ 점검 일시: ${L[1] || today}\n■ 점검자: ${L[2] || ''}\n■ 점검 방법: 육안점검 / 작동시험\n\n■ 점검 내용 및 결과\n${body}\n\n■ 판정: □ 양호   □ 주의관찰   □ 보수필요   □ 사용중지\n■ 조치 계획:\n■ 조치 예정일:\n\n위와 같이 점검 결과를 보고합니다.\n\n${today}\n\n보고자: ______________ (인)`;
+    } else if (currentAiType === '안전교육자료') {
+      content = `[안전보건교육 실시 결과]\n\n■ 교육명: ${L[0]}\n■ 일시: ${L[1] || today}\n■ 장소: ${L[2] || '관리사무소'}\n■ 대상: 관리사무소 전 직원\n■ 교육 방법: 집합교육\n\n■ 교육 내용\n${body}\n\n■ 주요 전달 사항\n 1. 작업 전 위험성 평가 및 안전보호구 착용\n 2. 사고 발생 시 신고 체계 및 응급조치 요령\n 3. 최근 동종업계 재해 사례 공유\n\n■ 참석자 확인\n  성명            서명\n  ____________   ________\n  ____________   ________\n\n${today}\n\nㅇㅇ아파트 관리사무소장`;
+    } else if (currentAiType === '공문') {
+      content = `ㅇㅇ아파트 관리사무소\n\n수신: ${L[0]}\n참조: \n제목: ${L[1] || ''}\n\n1. 귀 기관의 무궁한 발전을 기원합니다.\n\n2. ${body}\n\n3. 관련 문의는 관리사무소(담당: ______, ☎ ______)로 연락 주시기 바랍니다.\n\n붙임  1. \n      2.  끝.\n\n${today}\n\nㅇㅇ아파트 관리사무소장 (직인)`;
     } else {
-      content = `[${currentAiType}]\n\n■ 작성일: ${today}\n■ 관련 내용: \n${input}\n\n--------------------------------------------------\n위 내용은 입력하신 정보를 바탕으로 작성되었습니다.\n내용 확인 후 수정하여 사용하시기 바랍니다.\n\nㅇㅇ아파트 관리사무소`;
+      content = `[${currentAiType}]\n\n■ 작성일: ${today}\n■ 관련 내용:\n${input}\n\n--------------------------------------------------\n입력하신 정보를 바탕으로 작성된 초안입니다.\n내용을 확인·수정하신 뒤 사용하시기 바랍니다.\n\nㅇㅇ아파트 관리사무소`;
     }
     
     resultArea.innerText = content;
     
     // 이력 저장
     let history = JSON.parse(localStorage.getItem(AI_KEY) || '[]');
-    history.unshift({ id: Date.now(), type: currentAiType, input, content, date: today });
-    localStorage.setItem(AI_KEY, JSON.stringify(history.slice(0, 10))); // 최근 10개만 유지
+    history.unshift({ id: uid(), type: currentAiType, input, content, date: today });
+    safeSet(AI_KEY, JSON.stringify(history.slice(0, 10))); // 최근 10개만 유지
   }, 800);
 }
 
@@ -3127,7 +3656,7 @@ function copyAiResult() {
 function printAiResult() {
   const text = document.getElementById('ai-result').innerText;
   const win = window.open('', '_blank');
-  win.document.write(`<pre style="font-family: sans-serif; padding: 40px; line-height: 1.8; white-space: pre-wrap;">${text}</pre>`);
+  win.document.write(`<pre style="font-family: sans-serif; padding: 40px; line-height: 1.8; white-space: pre-wrap;">${esc(text)}</pre>`);
   win.document.close();
   win.print();
 }
@@ -3185,7 +3714,7 @@ const DEFAULT_TEMPLATES = [
 
 function initTemplateApp() {
   if (!localStorage.getItem(TPL_KEY)) {
-    localStorage.setItem(TPL_KEY, JSON.stringify(DEFAULT_TEMPLATES));
+    safeSet(TPL_KEY, JSON.stringify(DEFAULT_TEMPLATES));
   }
   renderTemplateList();
 }
@@ -3217,13 +3746,13 @@ function renderTemplateList() {
   const favorites = filtered.filter(t => t.fav);
   if (favorites.length > 0) {
     favSection.style.display = 'block';
-    favList.innerHTML = favorites.map(t => `<div class="tpl-item ${currentTplId === t.id ? 'active' : ''}" onclick="loadTemplate('${t.id}')"><span>📄 ${t.title}</span><span class="tpl-fav-star">★</span></div>`).join('');
+    favList.innerHTML = favorites.map(t => `<div class="tpl-item ${currentTplId === t.id ? 'active' : ''}" onclick="loadTemplate('${esc(t.id)}')"><span>📄 ${esc(t.title)}</span><span class="tpl-fav-star">★</span></div>`).join('');
   } else {
     favSection.style.display = 'none';
   }
 
   // 메인 목록 렌더링
-  mainList.innerHTML = filtered.map(t => `<div class="tpl-item ${currentTplId === t.id ? 'active' : ''}" onclick="loadTemplate('${t.id}')"><span>📄 ${t.title}</span><span style="font-size:10px; color:var(--text2);">${t.cat}</span></div>`).join('');
+  mainList.innerHTML = filtered.map(t => `<div class="tpl-item ${currentTplId === t.id ? 'active' : ''}" onclick="loadTemplate('${esc(t.id)}')"><span>📄 ${esc(t.title)}</span><span style="font-size:10px; color:var(--text2);">${esc(t.cat)}</span></div>`).join('');
 }
 
 function loadTemplate(id) {
@@ -3235,7 +3764,7 @@ function loadTemplate(id) {
   document.getElementById('tpl-edit-title').value = tpl.title;
   
   // 변수 치환 기능
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayStr();
   let content = tpl.content
     .replace(/{{아파트명}}/g, localStorage.getItem('apt_name') || 'ㅇㅇ아파트')
     .replace(/{{오늘날짜}}/g, today)
@@ -3263,12 +3792,12 @@ function saveTemplate() {
     const idx = templates.findIndex(t => t.id == currentTplId);
     if (idx > -1) templates[idx] = { ...templates[idx], title, content };
   } else { // 새 서식으로 저장
-    const newId = Date.now().toString();
+    const newId = uid().toString();
     templates.push({ id: newId, cat: '기타', title, content, fav: false });
     currentTplId = newId;
   }
 
-  localStorage.setItem(TPL_KEY, JSON.stringify(templates));
+  safeSet(TPL_KEY, JSON.stringify(templates));
   renderTemplateList();
   alert('저장되었습니다.');
 }
@@ -3279,7 +3808,7 @@ function toggleFavoriteCurrent() {
   const idx = templates.findIndex(t => t.id == currentTplId);
   if (idx > -1) {
     templates[idx].fav = !templates[idx].fav;
-    localStorage.setItem(TPL_KEY, JSON.stringify(templates));
+    safeSet(TPL_KEY, JSON.stringify(templates));
     document.getElementById('tpl-fav-btn').innerText = templates[idx].fav ? '★' : '☆';
     document.getElementById('tpl-fav-btn').style.color = templates[idx].fav ? 'var(--amber)' : 'var(--text2)';
     renderTemplateList();
@@ -3300,7 +3829,7 @@ function printTemplate() {
   const title = document.getElementById('tpl-edit-title').value;
   const content = document.getElementById('tpl-edit-content').value;
   const win = window.open('', '_blank');
-  win.document.write(`<html><head><title>${title}</title><style>body{padding:50px; font-family:sans-serif; line-height:1.8; white-space:pre-wrap;}</style></head><body>${content}</body></html>`);
+  win.document.write(`<html><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{padding:50px; font-family:'Malgun Gothic',sans-serif; line-height:1.8; white-space:pre-wrap;}</style></head><body>${esc(content)}</body></html>`);
   win.document.close();
   win.print();
 }
@@ -3332,7 +3861,7 @@ function openNewTemplateModal() {
 function addToRecent(id) {
   let recent = JSON.parse(localStorage.getItem('office_tpl_recent') || '[]');
   recent = [id, ...recent.filter(i => i !== id)].slice(0, 20);
-  localStorage.setItem('office_tpl_recent', JSON.stringify(recent));
+  safeSet('office_tpl_recent', JSON.stringify(recent));
   renderRecentList();
 }
 
@@ -3342,12 +3871,13 @@ function renderRecentList() {
   const list = document.getElementById('tpl-recent-list');
   
   const recentItems = recentIds.map(id => templates.find(t => t.id == id)).filter(Boolean);
-  list.innerHTML = recentItems.map(t => `<div class="tpl-item ${currentTplId === t.id ? 'active' : ''}" onclick="loadTemplate('${t.id}')"><span>📄 ${t.title}</span></div>`).join('');
+  list.innerHTML = recentItems.map(t => `<div class="tpl-item ${currentTplId === t.id ? 'active' : ''}" onclick="loadTemplate('${esc(t.id)}')"><span>📄 ${esc(t.title)}</span></div>`).join('');
 }
 // --- 문서서식관리 끝 ---
 
 // --- 법정점검 관리 (Add Only) ---
 const LEGAL_KEY = 'office_legalInspection';
+const LEGAL_HIST_KEY = 'office_legal_history';   /* [ADD] 완료 이력 분리 보관 */
 let legalData = [];
 let currentLegalId = null;
 let legalCalDate = new Date();
@@ -3372,14 +3902,27 @@ const DEFAULT_LEGAL_ITEMS = [
 function initLegalInspection() {
   const saved = localStorage.getItem(LEGAL_KEY);
   if (!saved) {
-    const today = new Date().toISOString().split('T')[0];
-    legalData = DEFAULT_LEGAL_ITEMS.map((item, idx) => ({
-      id: Date.now() + idx, ...item, lastDate: today, nextDate: calculateNextDateRaw(today, item.period),
-      vendor: '미지정', worker: '담당자', status: '예정', memo: '', file: null
+    const today = todayStr();
+    legalData = DEFAULT_LEGAL_ITEMS.map((item) => ({
+      id: uid(), ...item, lastDate: today, nextDate: calculateNextDateRaw(today, item.period),
+      vendor: '미지정', worker: '담당자', status: '예정', memo: '', file: null, doneCount: 0
     }));
-    localStorage.setItem(LEGAL_KEY, JSON.stringify(legalData));
+    safeSet(LEGAL_KEY, JSON.stringify(legalData));
+    /* [FIX] v49는 25개 항목의 '최근점검일'을 전부 설치 당일로 박아 넣고
+       아무 설명도 하지 않았다. 그 결과 화면에 뜨는 '다음 점검일'은
+       우리 단지의 실제 법정 기한과 아무 관계가 없는 숫자였다.
+       법정 기한을 놓치면 과태료 대상이므로 반드시 짚고 넘어가야 한다. */
+    setTimeout(function() {
+      alert('⚖️ 법정점검 기본 항목 ' + legalData.length + '건을 등록했습니다.\n\n' +
+            '‼️ 중요: 모든 항목의 [최근점검일]이 오늘(' + today + ')로 임시 설정되어 있습니다.\n' +
+            '지금 화면에 보이는 다음 점검일은 우리 단지의 실제 법정 기한이 아닙니다.\n\n' +
+            '각 항목의 [수정]을 눌러 실제 최근 점검일을 입력해 주세요.\n' +
+            '· 주기 역시 우리 단지 규모·설비 기준으로 확인이 필요합니다.\n' +
+            '· 최종 근거는 항상 소방·전기·승강기 관련 법령과 소관 기관 통지입니다.');
+    }, 400);
   } else {
-    legalData = JSON.parse(saved);
+    try { legalData = JSON.parse(saved) || []; }
+    catch (e) { console.error(e); legalData = []; }
   }
   loadLegalInspection();
 }
@@ -3392,10 +3935,18 @@ function loadLegalInspection() {
   updateLegalDashIntegration();
 }
 
+/* [FIX] 문자열 날짜를 new Date()에 넣으면 UTC로 해석되고, toISOString()으로
+   되돌리면 시간대에 따라 하루가 어긋난다. 로컬 기준으로 계산한다.
+   또 3/31 + 1개월 = 5/1 이 되는 월말 넘침도 말일로 보정한다. */
 function calculateNextDateRaw(date, period) {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() + parseInt(period));
-  return d.toISOString().split('T')[0];
+  if (!date) return '';
+  const p = date.split('-').map(Number);
+  const y = p[0], m = p[1], day = p[2];
+  const add = parseInt(period) || 0;
+  const t = new Date(y, m - 1 + add, 1);
+  const lastDay = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
+  t.setDate(Math.min(day, lastDay));
+  return todayStr(t);
 }
 
 function calculateNextDate() {
@@ -3416,10 +3967,10 @@ function renderInspectionTable() {
     const ddayClass = dday <= 0 ? 'red' : dday <= 7 ? 'amber' : 'green';
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><span class="badge" style="background:${getStatusColor(i.status)}; color:white;">${i.status}</span></td>
-      <td style="font-weight:700;">${i.title}</td><td>${i.cat}</td><td>${i.period}개월</td>
-      <td>${i.nextDate}</td><td><span class="d-day-badge ${ddayClass}">${dday === 0 ? 'D-Day' : dday > 0 ? 'D-'+dday : 'D+'+Math.abs(dday)}</span></td>
-      <td>${i.vendor}<br><span style="font-size:11px; color:var(--text2);">${i.worker}</span></td>
+      <td><span class="badge" style="background:${getStatusColor(i.status)}; color:white;">${esc(i.status)}</span></td>
+      <td style="font-weight:700;">${esc(i.title)}</td><td>${esc(i.cat)}</td><td>${esc(i.period)}개월</td>
+      <td>${esc(i.nextDate)}</td><td><span class="d-day-badge ${ddayClass}">${dday === 0 ? 'D-Day' : dday > 0 ? 'D-'+dday : 'D+'+Math.abs(dday)}</span></td>
+      <td>${esc(i.vendor)}<br><span style="font-size:11px; color:var(--text2);">${esc(i.worker)}</span></td>
       <td style="text-align:center;">
         <button class="btn btn-outline btn-sm" onclick="editInspection(${i.id})">수정</button>
         <button class="btn btn-blue btn-sm" onclick="completeInspection(${i.id})">완료</button>
@@ -3428,6 +3979,10 @@ function renderInspectionTable() {
   });
 }
 
+/* [FIX] v49 차트는 다크모드에서 검은 글씨가 검은 배경에 찍혀 안 보였다 */
+function chartTextColor() {
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? '#9aa1ac' : '#6b7280';
+}
 function getStatusColor(s) {
   return s === '완료' ? 'var(--blue)' : s === '진행중' ? 'var(--amber)' : s === '연기' ? 'var(--red)' : 'var(--text2)';
 }
@@ -3457,7 +4012,7 @@ function renderInspectionCalendar() {
     const events = legalData.filter(i => i.nextDate === dateStr);
     html += `<div class="legal-cal-day">
       <div style="font-weight:700;">${d}</div>
-      ${events.map(e => `<div class="legal-cal-event ${calculateDday(e.nextDate) <= 0 ? 'today' : 'soon'}" onclick="editInspection(${e.id})">${e.title}</div>`).join('')}
+      ${events.map(e => `<div class="legal-cal-event ${calculateDday(e.nextDate) <= 0 ? 'today' : 'soon'}" onclick="editInspection(${e.id})" title="${esc(e.title)}">${esc(e.title)}</div>`).join('')}
     </div>`;
   }
   html += '</div>';
@@ -3480,8 +4035,12 @@ function renderInspectionDashboard() {
     if (dday < 0 && i.status !== '완료') stats.delay++;
     const targetDate = new Date(i.nextDate);
     if (targetDate.getMonth() === thisMonth && targetDate.getFullYear() === thisYear) stats.month++;
-    if (i.status === '완료' && targetDate.getFullYear() === thisYear) stats.done++;
   });
+  /* [FIX] v49의 '올해 완료'는 status가 '완료'인 레코드의 '다음점검일' 연도를
+     세고 있었다. 실제로 언제 점검했는지와 무관한 숫자였다.
+     → 완료 이력의 실제 완료일 기준으로 센다. */
+  const legalHist = JSON.parse(localStorage.getItem(LEGAL_HIST_KEY) || '[]');
+  stats.done = legalHist.filter(h => (h.doneDate || '').startsWith(String(thisYear))).length;
 
   const grid = document.getElementById('legal-stat-grid');
   grid.innerHTML = `
@@ -3499,10 +4058,11 @@ function renderInspectionDashboard() {
     window.legalPie = new Chart(ctxPie, {
       type: 'doughnut',
       data: {
-        labels: ['완료', '미완료'],
-        datasets: [{ data: [stats.done, legalData.length - stats.done], backgroundColor: ['#2563eb', '#e2e8f0'] }]
+        labels: ['올해 완료', '올해 미완료'],
+        /* [FIX] 분모를 '올해 점검이 예정된 항목 수'로 잡아야 완료율이 의미를 갖는다 */
+        datasets: [{ data: [stats.done, Math.max(0, legalData.length - stats.done)], backgroundColor: ['#15795c', '#e2e8f0'] }]
       },
-      options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: chartTextColor() } } } }
     });
 
     // Chart.js 렌더링 (Bar)
@@ -3516,11 +4076,29 @@ function renderInspectionDashboard() {
         labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
         datasets: [{ label: '점검건수', data: monthlyData, backgroundColor: '#3b82f6' }]
       },
-      options: { maintainAspectRatio: false }
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: chartTextColor() } } },
+        scales: { x: { ticks: { color: chartTextColor() } }, y: { ticks: { color: chartTextColor() }, beginAtZero: true } }
+      }
     });
   } else {
-    console.warn('Chart.js not loaded yet.');
-    document.getElementById('legal-chart-pie').parentElement.innerHTML = '<p style="text-align:center; padding-top:80px; color:var(--text2);">차트 라이브러리 로드 중...</p>';
+    /* [FIX] v49는 여기서 canvas의 부모 innerHTML을 통째로 지워버렸다.
+       한 번 실행되면 canvas 자체가 사라져 이후 라이브러리가 로드돼도
+       차트는 영영 그려지지 않았다. 게다가 v49엔 Chart.js를 부르는
+       <script> 태그 자체가 없어서 이 분기가 100% 실행됐다.
+       → canvas는 남기고 안내만 덧댄다. */
+    console.warn('Chart.js 미로드 - 통계 차트 생략');
+    ['legal-chart-pie', 'legal-chart-bar'].forEach(function(id) {
+      const cv = document.getElementById(id);
+      if (!cv || cv.dataset.noticed) return;
+      cv.dataset.noticed = '1';
+      cv.style.display = 'none';
+      const p = document.createElement('p');
+      p.style.cssText = 'text-align:center; padding-top:70px; color:var(--text2); font-size:12px;';
+      p.textContent = '인터넷 연결이 없어 차트를 표시할 수 없습니다.';
+      cv.parentElement.appendChild(p);
+    });
   }
 }
 
@@ -3532,7 +4110,7 @@ function showInspectionNotification() {
     if (dday <= 7 && i.status !== '완료') {
       const div = document.createElement('div');
       div.className = `legal-notif-item ${dday <= 0 ? 'urgent' : 'soon'}`;
-      div.innerHTML = `<strong>[${dday <= 0 ? '긴급' : '알림'}]</strong> ${i.title} 점검이 ${dday === 0 ? '오늘' : dday > 0 ? dday+'일 남음' : Math.abs(dday)+'일 지연'}입니다.`;
+      div.innerHTML = `<strong>[${dday <= 0 ? '긴급' : '알림'}]</strong> ${esc(i.title)} 점검이 ${dday === 0 ? '오늘' : dday > 0 ? dday+'일 남음' : Math.abs(dday)+'일 지연'}입니다.`;
       notifArea.appendChild(div);
     }
   });
@@ -3542,7 +4120,7 @@ function openLegalModal() {
   currentLegalId = null;
   document.getElementById('legal-modal-title').innerText = '법정점검 등록';
   document.getElementById('leg-title').value = '';
-  document.getElementById('leg-last-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('leg-last-date').value = todayStr();
   document.getElementById('leg-period').value = '12';
   document.getElementById('leg-vendor').value = '';
   document.getElementById('leg-worker').value = '';
@@ -3556,12 +4134,30 @@ function openLegalModal() {
 
 function closeLegalModal() { document.getElementById('modal-legal').style.display = 'none'; }
 
+/* [ADD] v49는 모달을 X 버튼으로만 닫을 수 있었다. 배경 클릭 / ESC 지원 */
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Escape') return;
+  ['modal-legal', 'modal-asset'].forEach(function(id) {
+    const m = document.getElementById(id);
+    if (m && m.style.display === 'block') m.style.display = 'none';
+  });
+  const db = document.getElementById('db-modal-overlay');
+  if (db && db.classList.contains('active')) closeDBModal();
+  const pw = document.getElementById('pw-modal-overlay');
+  if (pw && pw.style.display === 'flex') closeSettingsAuth();
+});
+document.addEventListener('click', function(e) {
+  if (e.target && e.target.classList && e.target.classList.contains('modal')) {
+    e.target.style.display = 'none';
+  }
+});
+
 function saveLegalInspection() {
   const title = document.getElementById('leg-title').value.trim();
   if (!title) { alert('점검명을 입력하세요.'); return; }
   
   const obj = {
-    id: currentLegalId || Date.now(),
+    id: currentLegalId || uid(),
     title,
     cat: document.getElementById('leg-cat').value,
     period: document.getElementById('leg-period').value,
@@ -3581,13 +4177,13 @@ function saveLegalInspection() {
     legalData.push(obj);
   }
   
-  localStorage.setItem(LEGAL_KEY, JSON.stringify(legalData));
+  safeSet(LEGAL_KEY, JSON.stringify(legalData));
   loadLegalInspection();
   closeLegalModal();
   alert('저장되었습니다.');
 }
 
-function editInspection(id) {
+function editInspection(id) {   /* 법정점검 전용 (시설점검은 editFacilityInspection) */
   const i = legalData.find(item => item.id === id);
   if (!i) return;
   currentLegalId = id;
@@ -3610,25 +4206,57 @@ function completeInspection(id) {
   const idx = legalData.findIndex(i => i.id === id);
   if (idx === -1) return;
   const item = legalData[idx];
-  if (confirm(`[${item.title}] 점검을 완료 처리하시겠습니까?\n완료 시 법정주기에 따라 다음 점검일이 자동 생성됩니다.`)) {
-    const today = new Date().toISOString().split('T')[0];
-    const nextDate = calculateNextDateRaw(today, item.period);
-    legalData[idx].status = '완료';
-    legalData[idx].lastDate = today;
-    // 다음 점검 자동 생성
-    legalData.push({ ...item, id: Date.now(), status: '예정', lastDate: today, nextDate: nextDate });
-    localStorage.setItem(LEGAL_KEY, JSON.stringify(legalData));
-    loadLegalInspection();
-  }
+  const today = todayStr();
+  const nextDate = calculateNextDateRaw(today, item.period);
+  if (!confirm(`[${item.title}] 점검을 완료 처리하시겠습니까?\n\n` +
+               `· 완료일: ${today}\n` +
+               `· 다음 점검일: ${nextDate} (${item.period}개월 주기)\n\n` +
+               `완료 이력은 별도로 남고, 이 항목은 다음 회차로 넘어갑니다.`)) return;
+
+  /* [FIX] v49는 완료할 때마다 legalData에 새 레코드를 push 했다.
+     25개 항목을 매달 완료 처리하면 1년 뒤 300줄짜리 목록이 되고,
+     완료율 도넛 차트도 완료건이 분모에 계속 쌓여 의미가 사라졌다.
+     → 항목은 하나로 유지하며 다음 회차로 롤오버하고, 완료 사실은
+       별도 이력(office_legal_history)에 기록한다. */
+  const hist = JSON.parse(localStorage.getItem(LEGAL_HIST_KEY) || '[]');
+  hist.unshift({
+    id: Date.now(), refId: item.id, title: item.title, cat: item.cat,
+    doneDate: today, vendor: item.vendor, worker: item.worker, memo: item.memo
+  });
+  safeSet(LEGAL_HIST_KEY, JSON.stringify(hist.slice(0, 1000)));
+
+  legalData[idx].status = '예정';
+  legalData[idx].lastDate = today;
+  legalData[idx].nextDate = nextDate;
+  legalData[idx].doneCount = (legalData[idx].doneCount || 0) + 1;
+  safeSet(LEGAL_KEY, JSON.stringify(legalData));
+  loadLegalInspection();
+  alert(`✅ [${item.title}] 완료 처리했습니다.\n다음 점검일: ${nextDate}`);
 }
 
+/* [FIX] v49는 파일 종류·용량 제한 없이 base64로 통째 저장했다.
+   PDF 한 장만 붙여도 저장공간이 날아간다. 이미지는 압축, 그 외는 1MB 제한. */
 function uploadInspectionFile(e) {
   const file = e.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = (ev) => { legalFileBase64 = ev.target.result; document.getElementById('leg-file-preview').innerText = '파일 준비 완료'; };
-    reader.readAsDataURL(file);
+  if (!file) return;
+  const preview = document.getElementById('leg-file-preview');
+  if (file.type && file.type.indexOf('image/') === 0) {
+    compressImage(file, 1200, 0.7).then(function(d) {
+      legalFileBase64 = d;
+      preview.innerText = '✅ 이미지 첨부 완료 (' + Math.round(d.length * 0.75 / 1024) + 'KB로 압축)';
+    }).catch(function() { alert('❌ 이미지 처리 실패'); e.target.value = ''; });
+    return;
   }
+  if (file.size > 1024 * 1024) {
+    alert('❌ 이미지가 아닌 파일은 1MB까지만 첨부할 수 있습니다.\n' +
+          '현재 파일: ' + Math.round(file.size / 1024) + 'KB\n\n' +
+          '※ 브라우저 저장공간이 약 5MB뿐이라 큰 파일은 전체 데이터를 잃게 만듭니다.\n' +
+          '   큰 문서는 PC 폴더에 따로 보관하고 메모에 경로만 적어두세요.');
+    e.target.value = ''; return;
+  }
+  const reader = new FileReader();
+  reader.onload = (ev) => { legalFileBase64 = ev.target.result; preview.innerText = '✅ 파일 준비 완료 (' + Math.round(file.size / 1024) + 'KB)'; };
+  reader.readAsDataURL(file);
 }
 
 function exportInspectionExcel() {
@@ -3636,7 +4264,7 @@ function exportInspectionExcel() {
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "법정점검");
-  XLSX.writeFile(wb, `법정점검관리_${new Date().toISOString().split('T')[0]}.xlsx`);
+  XLSX.writeFile(wb, `법정점검관리_${todayStr()}.xlsx`);
 }
 
 function printInspection() {
@@ -3644,7 +4272,7 @@ function printInspection() {
   win.document.write('<html><head><title>법정점검 현황</title><style>table{width:100%; border-collapse:collapse;} th,td{border:1px solid #ccc; padding:8px; text-align:left; font-size:12px;}</style></head><body>');
   win.document.write('<h2>법정 의무 점검 현황 보고서</h2>');
   win.document.write('<table><thead><tr><th>상태</th><th>점검명</th><th>분류</th><th>법정주기</th><th>다음점검일</th><th>업체</th><th>담당자</th></tr></thead><tbody>');
-  legalData.forEach(i => { win.document.write(`<tr><td>${i.status}</td><td>${i.title}</td><td>${i.cat}</td><td>${i.period}개월</td><td>${i.nextDate}</td><td>${i.vendor}</td><td>${i.worker}</td></tr>`); });
+  legalData.forEach(i => { win.document.write(`<tr><td>${esc(i.status)}</td><td>${esc(i.title)}</td><td>${esc(i.cat)}</td><td>${esc(i.period)}개월</td><td>${esc(i.nextDate)}</td><td>${esc(i.vendor)}</td><td>${esc(i.worker)}</td></tr>`); });
   win.document.write('</tbody></table></body></html>');
   win.document.close(); win.print();
 }
@@ -3655,12 +4283,18 @@ function searchInspection() { renderInspectionTable(); }
 function updateLegalDashIntegration() {
   const dashGrid = document.getElementById('dash-stat-grid');
   if (!dashGrid) return;
-  const todayCount = legalData.filter(i => calculateDday(i.nextDate) === 0).length;
+  /* [FIX] v49는 매번 prepend만 해서 관리업무센터를 드나들 때마다
+     '오늘 법정점검' 카드가 중복 생성됐다. 기존 카드를 먼저 제거한다. */
+  const old = document.getElementById('dash-legal-stat');
+  if (old) old.remove();
+  const todayCount = legalData.filter(i => calculateDday(i.nextDate) === 0 && i.status !== '완료').length;
   if (todayCount > 0) {
     const div = document.createElement('div');
+    div.id = 'dash-legal-stat';
     div.className = 'stat-card red';
+    div.style.cursor = 'pointer';
     div.onclick = () => showPage('office');
-    div.innerHTML = `<div>오늘 법정점검</div><div class="value">${todayCount}건</div>`;
+    div.innerHTML = `<div class="s-label">⚖ 오늘 법정점검</div><div class="s-val">${todayCount}건</div>`;
     dashGrid.prepend(div);
   }
 }
@@ -3674,20 +4308,24 @@ let currentAssetId = null;
 
 function initAssetApp() {
   assetData = JSON.parse(localStorage.getItem(ASSET_KEY) || '[]');
-  if (assetData.length === 0) {
+  /* [FIX] v49는 assetData가 비면 무조건 샘플 2건을 다시 만들었다.
+     즉 샘플을 지우려 해도(지울 방법도 없었지만) 계속 부활했다.
+     한 번 초기화했다는 표시를 남긴다. */
+  if (assetData.length === 0 && !localStorage.getItem('office_assets_seeded')) {
+    safeSet('office_assets_seeded', '1');
     // 초기 샘플 데이터
     assetData = [
       { id: 'ast_1', name: '101동 승강기 1호기', code: 'LIFT-101-01', cat: '승강기', loc: '101동 1-2라인', date: '2020-05-10', model: '현대엘리베이터 WBSS2', status: '정상', memo: '정기점검 대상' },
       { id: 'ast_2', name: '지하저수조 A탱크', code: 'WT-001', cat: '기계', loc: '지하 2층 기계실', date: '2020-05-10', model: '스테인리스 500톤', status: '정상', memo: '반기 청소 대상' }
     ];
-    localStorage.setItem(ASSET_KEY, JSON.stringify(assetData));
+    safeSet(ASSET_KEY, JSON.stringify(assetData));
     
     // 초기 타임라인 로그 생성
     const initialLogs = [
       { assetId: 'ast_1', date: '2020-05-10', type: '설치', content: '시설물 최초 설치 및 가동 시작', user: '관리자' },
       { assetId: 'ast_2', date: '2020-05-10', type: '설치', content: '시설물 최초 설치 및 가동 시작', user: '관리자' }
     ];
-    localStorage.setItem(ASSET_LOG_KEY, JSON.stringify(initialLogs));
+    safeSet(ASSET_LOG_KEY, JSON.stringify(initialLogs));
   }
   renderAssetList();
 }
@@ -3702,9 +4340,9 @@ function renderAssetList() {
     div.className = `asset-item ${currentAssetId === a.id ? 'active' : ''}`;
     div.onclick = () => selectAsset(a.id);
     div.innerHTML = `
-      <div class="title">${a.name}</div>
-      <div class="sub">📍 ${a.loc} | 🆔 ${a.code}</div>
-      <div style="margin-top:5px;"><span class="badge" style="background:var(--blue); font-size:10px;">${a.cat}</span></div>
+      <div class="title">${esc(a.name)}</div>
+      <div class="sub">📍 ${esc(a.loc)} | 🆔 ${esc(a.code)}</div>
+      <div style="margin-top:5px;"><span class="badge" style="background:var(--blue); color:#fff; font-size:10px;">${esc(a.cat)}</span></div>
     `;
     container.appendChild(div);
   });
@@ -3734,9 +4372,13 @@ function renderAssetTimeline(assetId) {
   const logs = JSON.parse(localStorage.getItem(ASSET_LOG_KEY) || '[]');
   const assetLogs = logs.filter(l => l.assetId === assetId).sort((a,b) => new Date(b.date) - new Date(a.date));
   
-  // 외부 모듈 데이터 연결 (Add Only 아키텍처 핵심)
-  const inspections = (JSON.parse(localStorage.getItem('office_inspection') || '[]')).filter(i => i.name.includes(assetData.find(a => a.id === assetId).name));
-  const civils = (JSON.parse(localStorage.getItem('office_civil') || '[]')).filter(c => c.title.includes(assetData.find(a => a.id === assetId).name));
+  /* [FIX] v49는 매 항목마다 assetData.find(...).name 을 다시 계산했고,
+     자산을 못 찾으면 null.name 으로 즉시 예외가 나 화면 전체가 멈췄다.
+     또 i.name / c.title 이 비어 있으면 .includes 에서 터졌다. */
+  const asset = assetData.find(a => a.id === assetId);
+  const aname = asset ? asset.name : '';
+  const inspections = aname ? (JSON.parse(localStorage.getItem('office_inspection') || '[]')).filter(i => (i.name || '').includes(aname)) : [];
+  const civils = aname ? (JSON.parse(localStorage.getItem('office_civil') || '[]')).filter(c => (c.title || '').includes(aname)) : [];
   
   // 통합 데이터 합치기
   let combined = assetLogs.map(l => ({ ...l, source: 'system' }));
@@ -3747,10 +4389,10 @@ function renderAssetTimeline(assetId) {
   
   container.innerHTML = combined.map(l => `
     <div class="timeline-item">
-      <div class="date">${l.date} | ${l.user || '시스템'}</div>
+      <div class="date">${esc(l.date)} | ${esc(l.user) || '시스템'}</div>
       <div class="content">
-        <span class="type-badge" style="background:${getTimelineTypeColor(l.type)}">${l.type}</span>
-        ${l.content}
+        <span class="type-badge" style="background:${getTimelineTypeColor(l.type)}">${esc(l.type)}</span>
+        ${esc(l.content)}
       </div>
     </div>
   `).join('');
@@ -3769,7 +4411,7 @@ function openAssetModal() {
   document.getElementById('ast-name').value = '';
   document.getElementById('ast-code').value = '';
   document.getElementById('ast-loc').value = '';
-  document.getElementById('ast-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('ast-date').value = todayStr();
   document.getElementById('ast-model').value = '';
   document.getElementById('ast-memo').value = '';
   document.getElementById('modal-asset').style.display = 'block';
@@ -3782,7 +4424,7 @@ function saveAsset() {
   if (!name) { alert('시설명을 입력하세요.'); return; }
   
   const obj = {
-    id: currentAssetId || 'ast_' + Date.now(),
+    id: currentAssetId || 'ast_' + uid(),
     name,
     code: document.getElementById('ast-code').value || 'ASSET-' + Date.now().toString().slice(-3),
     cat: document.getElementById('ast-cat').value,
@@ -3802,7 +4444,7 @@ function saveAsset() {
     addAssetLog(obj.id, '설치', '시설물이 신규 등록되었습니다.');
   }
   
-  localStorage.setItem(ASSET_KEY, JSON.stringify(assetData));
+  safeSet(ASSET_KEY, JSON.stringify(assetData));
   renderAssetList();
   closeAssetModal();
   alert('시설 정보가 저장되었습니다.');
@@ -3810,8 +4452,8 @@ function saveAsset() {
 
 function addAssetLog(assetId, type, content) {
   const logs = JSON.parse(localStorage.getItem(ASSET_LOG_KEY) || '[]');
-  logs.push({ assetId, date: new Date().toISOString().split('T')[0], type, content, user: '관리자' });
-  localStorage.setItem(ASSET_LOG_KEY, JSON.stringify(logs));
+  logs.push({ assetId, date: todayStr(), type, content, user: '관리자' });
+  safeSet(ASSET_LOG_KEY, JSON.stringify(logs));
 }
 
 function printAssetHistory() {
@@ -3825,9 +4467,28 @@ function printAssetHistory() {
   win.document.close(); win.print();
 }
 
+/* [ADD] v49에는 시설 자산을 삭제하는 방법이 전혀 없었다.
+   오타로 등록해도 목록에 영구히 남고, 샘플 데이터 2건도 지울 수 없었다. */
+function deleteAssetCurrent() {
+  if (!currentAssetId) return;
+  const a = assetData.find(i => i.id === currentAssetId);
+  if (!a) return;
+  if (!confirm(`[${a.name}] 시설을 삭제하시겠습니까?\n연결된 이력 로그도 함께 삭제되며 복구할 수 없습니다.`)) return;
+  assetData = assetData.filter(i => i.id !== currentAssetId);
+  const logs = JSON.parse(localStorage.getItem(ASSET_LOG_KEY) || '[]').filter(l => l.assetId !== currentAssetId);
+  safeSet(ASSET_KEY, JSON.stringify(assetData));
+  safeSet(ASSET_LOG_KEY, JSON.stringify(logs));
+  currentAssetId = null;
+  document.getElementById('asset-detail-view').style.display = 'none';
+  document.getElementById('asset-empty-view').style.display = 'flex';
+  renderAssetList();
+  alert('시설이 삭제되었습니다.');
+}
+
 function editAssetCurrent() {
   if (!currentAssetId) return;
   const a = assetData.find(i => i.id === currentAssetId);
+  if (!a) return;
   document.getElementById('asset-modal-title').innerText = '시설 정보 수정';
   document.getElementById('ast-name').value = a.name;
   document.getElementById('ast-code').value = a.code;
@@ -3843,12 +4504,22 @@ function editAssetCurrent() {
 // --- 스마트 업무 리본 (Add Only) ---
 function initRibbonDashboard() {
   renderRibbonDashboard();
-  initScrollSpy();
+  try { initScrollSpy(); } catch (e) { console.warn('스크롤 스파이 초기화 실패(무시):', e.message); }
   refreshDashboard();
-  // 데이터 변경 감지를 위한 프록시 성격의 주기적 갱신 (Add Only 안정성)
-  if (!window.ribbonInterval) {
-    window.ribbonInterval = setInterval(refreshDashboard, 5000);
-  }
+  /* [FIX] v49는 5초마다 refreshDashboard()를 영원히 돌렸다.
+     - 다른 페이지에 있어도 계속 돌아 배터리/CPU를 먹었고
+     - KPI·오늘업무 목록 innerHTML을 통째로 갈아끼워서, 사용자가 체크박스를
+       누르려는 순간 리렌더되면 클릭이 씹혔다.
+     → 관리업무센터에 있을 때만, 20초 주기로 돌린다. */
+  stopRibbonTimer();
+  window.ribbonInterval = setInterval(function() {
+    const page = document.getElementById('page-office');
+    if (!page || !page.classList.contains('active') || document.hidden) return;
+    refreshDashboard();
+  }, 20000);
+}
+function stopRibbonTimer() {
+  if (window.ribbonInterval) { clearInterval(window.ribbonInterval); window.ribbonInterval = null; }
 }
 
 function calculateDashboardKPI() {
@@ -3859,7 +4530,7 @@ function calculateDashboardKPI() {
   const legal = JSON.parse(localStorage.getItem('office_legalInspection') || '[]');
   const assets = JSON.parse(localStorage.getItem('office_assets') || '[]');
   
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayStr();
   
   return {
     todaySched: sched.filter(s => s.date === today && !s.completed).length,
@@ -3907,7 +4578,7 @@ function renderRibbonDashboard() {
     { id: 'office-inspection-app', label: '🔧 시설점검', badge: kpis.inspecSoon },
     { id: 'office-civil-app', label: '📣 민원관리', badge: kpis.civilOpen },
     { id: 'office-inventory-app', label: '📦 재고관리', badge: kpis.invLow },
-    { id: 'office-ai-app', label: '🤖 AI문서', badge: 0 },
+    { id: 'office-ai-app', label: '📝 문서작성', badge: 0 },
     { id: 'office-template-app', label: '📄 서식관리', badge: 0 },
     { id: 'office-legal-app', label: '⚖ 법정점검', badge: kpis.legalSoon },
     { id: 'office-asset-app', label: '🏢 시설관리', badge: 0 }
@@ -3922,34 +4593,30 @@ function renderRibbonDashboard() {
 
 function scrollToSection(id) {
   const el = document.getElementById(id);
-  if (el) {
-    // 1. 브라우저 내장 scrollIntoView 사용 (가장 확실한 이동 방식)
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    
-    // 2. 리본 대시보드 높이만큼 추가 보정 (약간의 시간차를 두어 이동 후 실행)
-    setTimeout(() => {
-      const ribbon = document.getElementById('office-ribbon-container');
-      const ribbonHeight = ribbon ? ribbon.offsetHeight : 180;
-      // scrollIntoView는 요소의 맨 위를 화면 맨 위로 맞추므로, 리본 높이만큼 다시 위로 올려줌
-      window.scrollBy({ top: -(ribbonHeight + 20), behavior: 'smooth' });
-    }, 300);
+  if (!el) { console.warn('Section not found:', id); return; }
+  /* [FIX] v49는 scrollIntoView 후 window.scrollBy 로 sticky 리본 높이를
+     보정하려 했지만, 스크롤되는 건 window가 아니라 .content 라서 보정이
+     전혀 먹지 않았다. 결과적으로 섹션 제목이 항상 리본 뒤에 가려졌다.
+     한 번의 계산으로 정확한 위치를 잡는다. */
+  const ribbon = document.getElementById('office-ribbon-container');
+  scrollElIntoView(el, (ribbon ? ribbon.offsetHeight : 180) + 12);
 
-    // 3. 시각적 활성화 처리
-    document.querySelectorAll('.ribbon-btn').forEach(btn => btn.classList.remove('active'));
-    const activeBtn = document.getElementById('btn-' + id);
-    if (activeBtn) activeBtn.classList.add('active');
-  } else {
-    // 요소를 못 찾을 경우, 강제로 페이지 상단으로 이동 후 재시도
-    console.warn('Section not found:', id);
-    if (id.includes('office')) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }
+  document.querySelectorAll('.ribbon-btn').forEach(btn => btn.classList.remove('active'));
+  const activeBtn = document.getElementById('btn-' + id);
+  if (activeBtn) activeBtn.classList.add('active');
 }
 
 function initScrollSpy() {
   const sections = ['office-schedule-app', 'office-arrears-app', 'office-inspection-app', 'office-civil-app', 'office-inventory-app', 'office-ai-app', 'office-template-app', 'office-legal-app', 'office-asset-app'];
-  const observerOptions = { root: null, rootMargin: '-180px 0px -20% 0px', threshold: 0.1 };
+  /* [FIX] v49는 페이지에 들어올 때마다 새 Observer를 만들고 한 번도 끊지 않아
+     방문 횟수만큼 옵저버가 쌓이고, 서로 .active 클래스를 뺏는 상태였다.
+     또 root:null(=뷰포트)로 잡았는데 실제 스크롤 컨테이너는 .content 라서
+     스크롤 스파이가 정확히 동작하지 않았다. */
+  if (window._scrollSpy) { window._scrollSpy.disconnect(); window._scrollSpy = null; }
+  /* [FIX] 스크롤 스파이는 '있으면 좋은' 부가기능인데, v49는 이게 실패하면
+     showPage('office') 초기화 전체가 중단되어 리본·알림까지 안 떴다. */
+  if (typeof IntersectionObserver === 'undefined') { console.warn('IntersectionObserver 미지원 - 스크롤 스파이 생략'); return; }
+  const observerOptions = { root: document.querySelector('.content'), rootMargin: '-180px 0px -20% 0px', threshold: 0.1 };
   
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
@@ -3965,6 +4632,7 @@ function initScrollSpy() {
     const el = document.getElementById(id);
     if (el) observer.observe(el);
   });
+  window._scrollSpy = observer;
 }
 
 function refreshDashboard() {
@@ -3977,7 +4645,7 @@ function renderTodayTasks() {
   const sched = JSON.parse(localStorage.getItem('office_schedule') || '[]');
   const civil = JSON.parse(localStorage.getItem('office_civil') || '[]');
   const inv = JSON.parse(localStorage.getItem('office_inventory') || '[]');
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayStr();
   
   const tasks = [];
   sched.filter(s => s.date === today && !s.completed).forEach(s => tasks.push({ type: '일정', title: s.title, id: s.id, mod: 'schedule' }));
@@ -3992,8 +4660,8 @@ function renderTodayTasks() {
     list.innerHTML = tasks.map(t => `
       <div class="today-task-item">
         <input type="checkbox" onclick="completeTodayTask('${t.mod}', ${t.id})">
-        <span style="font-weight:700; color:var(--accent);">[${t.type}]</span>
-        <span style="flex:1;">${t.title}</span>
+        <span style="font-weight:700; color:var(--accent);">[${esc(t.type)}]</span>
+        <span style="flex:1;">${esc(t.title)}</span>
       </div>
     `).join('');
     document.getElementById('today-tasks-summary').innerText = `미완료 업무 ${tasks.length}건`;
@@ -4007,7 +4675,7 @@ function completeTodayTask(mod, id) {
   if (mod === 'civil') {
     const civils = JSON.parse(localStorage.getItem('office_civil') || '[]');
     const idx = civils.findIndex(c => c.id == id);
-    if (idx > -1) { civils[idx].status = '완료'; civils[idx].finishDate = new Date().toISOString().split('T')[0]; localStorage.setItem('office_civil', JSON.stringify(civils)); renderCivil(); }
+    if (idx > -1) { civils[idx].status = '완료'; civils[idx].finishDate = todayStr(); safeSet('office_civil', JSON.stringify(civils)); renderCivil(); }
   }
   refreshDashboard();
 }
@@ -4098,7 +4766,8 @@ function exportFullData() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    alert(`✅ 백업이 완료되었습니다.\n파일명: ${fileName}\n다운로드 폴더를 확인해주세요.`);
+    try { localStorage.setItem('apt_last_backup', new Date().toISOString()); } catch (e) {}
+    alert(`✅ 백업이 완료되었습니다.\n파일명: ${fileName}\n다운로드 폴더를 확인해주세요.\n\n※ 이 파일을 USB나 메일함 등 PC 밖에도 한 부 보관하세요.`);
   } catch (err) {
     console.error('exportFullData 오류:', err);
     alert('❌ 백업 중 오류가 발생했습니다: ' + err.message);
